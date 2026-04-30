@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-tertiary: #1a1a2e;
+  --bg-hover: #22223a;
+  --text-primary: #f0f0f5;
+  --text-secondary: #8888aa;
+  --text-muted: #555577;
+  --accent-yellow: #ffd700;
+  --accent-red: #ff2d55;
+  --accent-blue: #00d4ff;
+  --accent-green: #00ff88;
+  --accent-purple: #a855f7;
+  --border: #2a2a3e;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: radial-gradient(
+      ellipse at top,
+      rgba(168, 85, 247, 0.07),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse at bottom right,
+      rgba(255, 45, 85, 0.05),
+      transparent 60%
+    ),
+    var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Exo 2', system-ui, sans-serif;
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.012) 0,
+    rgba(255, 255, 255, 0.012) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+#root {
+  position: relative;
+  z-index: 2;
+}
+
+.font-display {
+  letter-spacing: 0.04em;
+}
+
+@layer components {
+  .clip-angled {
+    clip-path: polygon(
+      0 0,
+      100% 0,
+      100% calc(100% - 12px),
+      calc(100% - 12px) 100%,
+      0 100%
+    );
+  }
+
+  .clip-angled-tl {
+    clip-path: polygon(
+      12px 0,
+      100% 0,
+      100% 100%,
+      0 100%,
+      0 12px
+    );
+  }
+
+  .skeleton {
+    @apply animate-pulse-soft bg-bg-tertiary rounded;
+  }
+
+  .scroll-fade {
+    mask-image: linear-gradient(
+      to bottom,
+      black 80%,
+      transparent 100%
+    );
+  }
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0a0f;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2a3e;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a52;
+}
