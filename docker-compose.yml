@@ -3,8 +3,6 @@ services:
     image: mongo:7
     container_name: tournamently-mongo
     restart: unless-stopped
-    ports:
-      - "27017:27017"
     volumes:
       - mongo-data:/data/db
     healthcheck:
@@ -21,8 +19,8 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
-    ports:
-      - "5000:5000"
+    expose:
+      - "5000"
     environment:
       PORT: 5000
       MONGODB_URI: mongodb://mongo:27017/tournamently
@@ -34,13 +32,13 @@ services:
       context: .
       dockerfile: client/Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:5000/api}
+        VITE_API_URL: ${VITE_API_URL:-/api}
     container_name: tournamently-client
     restart: unless-stopped
     depends_on:
       - server
     ports:
-      - "5173:80"
+      - "80:80"
 
   seed:
     build:
