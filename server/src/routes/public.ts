@@ -6,6 +6,7 @@ import { PlayoffMatch } from '../models/PlayoffMatch';
 import { computeLeaderboard } from '../services/leaderboardCalculator';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AppError } from '../utils/AppError';
+import { parseBody, playerInputSchema } from '../utils/validation';
 
 export const publicRouter = Router();
 
@@ -83,5 +84,36 @@ publicRouter.get(
         playersCount: players.length,
       },
     });
+  }),
+);
+
+publicRouter.post(
+  '/:slug/register',
+  asyncHandler(async (req, res) => {
+    const t = await Tournament.findOne({ slug: req.params.slug });
+    if (!t) throw new AppError('Tournament not found', 404);
+    if (t.fixturesGenerated) {
+      throw new AppError(
+        'Registration is closed: fixtures have already been generated.',
+        409,
+      );
+    }
+    const body = parseBody(playerInputSchema, req.body);
+    try {
+      const player = await Player.create({ ...body, tournament: t._id });
+      res.status(201).json({
+        _id: player._id,
+        name: player.name,
+        gamerTag: player.gamerTag,
+      });
+    } catch (err) {
+      if ((err as { code?: number })?.code === 11000) {
+        throw new AppError(
+          'That gamer tag is already taken in this tournament.',
+          409,
+        );
+      }
+      throw err;
+    }
   }),
 );

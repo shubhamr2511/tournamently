@@ -12,6 +12,7 @@ import { MatchCenter } from './pages/MatchCenter';
 import { PlayerProfile } from './pages/PlayerProfile';
 import { Playoffs } from './pages/Playoffs';
 import { PublicView } from './pages/PublicView';
+import { Register } from './pages/Register';
 import { Login } from './pages/Login';
 
 export default function App() {
@@ -42,6 +43,7 @@ export default function App() {
       </Route>
       <Route element={<PublicLayout />}>
         <Route path="/:slug" element={<PublicView />} />
+        <Route path="/:slug/register" element={<Register />} />
       </Route>
     </Routes>
   );

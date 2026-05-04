@@ -71,6 +71,11 @@ export function PublicView() {
             {stats.completedMatches}/{stats.totalMatches} matches
           </Badge>
           <Badge tone="gold">{stats.playersCount} players</Badge>
+          {!tournament.fixturesGenerated && (
+            <Link to={`/${slug}/register`}>
+              <Badge tone="gold">Register →</Badge>
+            </Link>
+          )}
           <Link to={`/t/${slug}/login`}>
             <Badge tone="gray">Admin →</Badge>
           </Link>
