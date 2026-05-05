@@ -3,6 +3,7 @@ import { AppShell } from './components/layout/AppShell';
 import { PublicLayout } from './components/layout/PublicLayout';
 import { Landing } from './pages/Landing';
 import { CreateTournament } from './pages/CreateTournament';
+import { EditTournament } from './pages/EditTournament';
 import { Dashboard } from './pages/Dashboard';
 import { Players } from './pages/Players';
 import { Fixtures } from './pages/Fixtures';
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/create" element={<CreateTournament />} />
         <Route path="/t/:slug/login" element={<Login />} />
         <Route path="/t/:slug/dashboard" element={<Dashboard />} />
+        <Route path="/t/:slug/settings" element={<EditTournament />} />
         <Route path="/t/:slug/players" element={<Players />} />
         <Route path="/t/:slug/fixtures" element={<Fixtures />} />
         <Route

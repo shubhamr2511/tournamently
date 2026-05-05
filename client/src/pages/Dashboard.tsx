@@ -119,6 +119,11 @@ export function Dashboard() {
         {!tournament.fixturesGenerated && isAdmin && (
           <Button onClick={generateFixtures}>Generate Fixtures</Button>
         )}
+        {isAdmin && (
+          <Link to={`/t/${slug}/settings`}>
+            <Button variant="outline">Edit Tournament</Button>
+          </Link>
+        )}
       </div>
 
       <section>

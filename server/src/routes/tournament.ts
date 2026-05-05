@@ -8,6 +8,7 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { AppError } from '../utils/AppError';
 import {
   createTournamentSchema,
+  updateTournamentSchema,
   parseBody,
 } from '../utils/validation';
 import { requireAuth, requireTournamentAdmin } from '../middleware/auth';
@@ -80,10 +81,25 @@ tournamentRouter.put(
     if (req.auth?.tournamentId !== req.params.id) {
       return next(new AppError('Not authorized', 403));
     }
-    const updates: Record<string, unknown> = { ...req.body };
-    delete updates.adminPassword;
-    delete updates.slug;
-    delete updates._id;
+    const body = parseBody(updateTournamentSchema, req.body);
+    const updates: Record<string, unknown> = { ...body };
+    if (typeof body.startDate === 'string') {
+      const d = new Date(body.startDate);
+      if (Number.isNaN(d.getTime())) throw new AppError('Invalid startDate', 400);
+      updates.startDate = d;
+    }
+    if (typeof body.endDate === 'string') {
+      const d = new Date(body.endDate);
+      if (Number.isNaN(d.getTime())) throw new AppError('Invalid endDate', 400);
+      updates.endDate = d;
+    }
+    if (
+      updates.startDate instanceof Date &&
+      updates.endDate instanceof Date &&
+      updates.endDate < updates.startDate
+    ) {
+      throw new AppError('endDate must be on or after startDate', 400);
+    }
     const t = await Tournament.findByIdAndUpdate(req.params.id, updates, {
       new: true,
       runValidators: true,

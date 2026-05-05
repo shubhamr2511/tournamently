@@ -48,6 +48,33 @@ export const createTournamentSchema = z.object({
   availableCharacters: z.array(z.string()).optional(),
 });
 
+export const updateTournamentSchema = z
+  .object({
+    name: z.string().min(1).max(80),
+    game: z.string().min(1).max(80),
+    description: z.string().max(1000),
+    playerCount: z.number().int().min(2).max(128),
+    matchFormat: matchFormatSchema,
+    startDate: z.string(),
+    endDate: z.string(),
+    matchesPerDay: z.number().int().min(1).max(50),
+    weekdaysOnly: z.boolean(),
+    characterLock: z.boolean(),
+    scoring: z
+      .object({
+        perfectRoundBonus: z.number().min(0),
+        fastWinBonus: z.number().min(0),
+        fastWinThresholdSeconds: z.number().min(1),
+      })
+      .partial(),
+    ranking: z.object({
+      primary: z.literal('wins'),
+      tiebreakers: z.array(tiebreakerSchema),
+    }),
+    availableCharacters: z.array(z.string()),
+  })
+  .partial();
+
 export const playerInputSchema = z.object({
   name: z.string().min(1).max(80),
   gamerTag: z.string().min(1).max(40),
