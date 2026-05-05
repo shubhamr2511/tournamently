@@ -38,7 +38,7 @@ services:
     depends_on:
       - server
     ports:
-      - "7777:80"
+      - "80:80"
 
   seed:
     build:
