@@ -41,3 +41,15 @@ export function initials(name: string): string {
     .slice(0, 2)
     .join('');
 }
+
+export function firstNameWithInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0];
+  const [first, ...rest] = parts;
+  const lastInitials = rest
+    .map((p) => p[0]?.toUpperCase() || '')
+    .filter(Boolean)
+    .join(' ');
+  return lastInitials ? `${first} ${lastInitials}` : first;
+}

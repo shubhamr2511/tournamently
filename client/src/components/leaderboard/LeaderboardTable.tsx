@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { Link } from 'react-router-dom';
 import { CharacterAvatar } from '../player/CharacterAvatar';
+import { firstNameWithInitials } from '../../utils/formatting';
 import type { ILeaderboardRow } from '../../types';
 
 interface Props {
@@ -77,7 +78,7 @@ export function LeaderboardTable({ rows, slug, highlightZones = true }: Props) {
                       {r.player.gamerTag}
                     </div>
                     <div className="text-[10px] text-text-muted truncate">
-                      {r.player.character || r.player.department || ''}
+                      {firstNameWithInitials(r.player.name)}
                     </div>
                   </div>
                 </Link>
