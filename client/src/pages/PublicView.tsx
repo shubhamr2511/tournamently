@@ -88,7 +88,7 @@ export function PublicView() {
           <EmptyState title="No matches yet" />
         ) : (
           <Card className="overflow-hidden">
-            <LeaderboardTable rows={leaderboard.slice(0, 16)} slug={slug} />
+            <LeaderboardTable rows={leaderboard} slug={slug} />
           </Card>
         )}
       </section>
