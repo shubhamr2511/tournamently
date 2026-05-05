@@ -33,6 +33,10 @@ fixtureRouter.post(
     }
 
     const ids = players.map((p) => String(p._id));
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
     const pairs = generateRoundRobin(ids);
 
     const sched = distributeFixturesAcrossDates(pairs.length, {
