@@ -3,20 +3,21 @@ import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { StatusBadge } from '../ui/StatusBadge';
 import { CharacterAvatar } from '../player/CharacterAvatar';
-import { formatDate } from '../../utils/formatting';
+import { formatDate, firstNameWithInitials } from '../../utils/formatting';
 import type { IMatch, IPlayer } from '../../types';
 
 interface Props {
   match: IMatch;
   slug: string;
   isAdmin?: boolean;
+  showPlayerName?: boolean;
 }
 
 function asPlayer(p: string | IPlayer): IPlayer | null {
   return typeof p === 'object' ? (p as IPlayer) : null;
 }
 
-export function MatchCard({ match, slug, isAdmin }: Props) {
+export function MatchCard({ match, slug, isAdmin, showPlayerName }: Props) {
   const a = asPlayer(match.playerA);
   const b = asPlayer(match.playerB);
   const winnerId = match.result?.winner;
@@ -56,11 +57,17 @@ export function MatchCard({ match, slug, isAdmin }: Props) {
               <div className="font-display tracking-wider truncate">
                 {a?.gamerTag || '?'}
               </div>
-              {a?.character && (
-                <div className="text-[10px] text-text-muted truncate">
-                  {a.character}
-                </div>
-              )}
+              {showPlayerName
+                ? a?.name && (
+                    <div className="text-[10px] text-text-muted truncate">
+                      {firstNameWithInitials(a.name)}
+                    </div>
+                  )
+                : a?.character && (
+                    <div className="text-[10px] text-text-muted truncate">
+                      {a.character}
+                    </div>
+                  )}
             </div>
           </div>
           <div className="text-center">
@@ -88,11 +95,17 @@ export function MatchCard({ match, slug, isAdmin }: Props) {
               <div className="font-display tracking-wider truncate">
                 {b?.gamerTag || '?'}
               </div>
-              {b?.character && (
-                <div className="text-[10px] text-text-muted truncate">
-                  {b.character}
-                </div>
-              )}
+              {showPlayerName
+                ? b?.name && (
+                    <div className="text-[10px] text-text-muted truncate">
+                      {firstNameWithInitials(b.name)}
+                    </div>
+                  )
+                : b?.character && (
+                    <div className="text-[10px] text-text-muted truncate">
+                      {b.character}
+                    </div>
+                  )}
             </div>
             <CharacterAvatar
               name={b?.gamerTag || '?'}

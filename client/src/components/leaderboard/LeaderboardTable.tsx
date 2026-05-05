@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { useLayoutEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { CharacterAvatar } from '../player/CharacterAvatar';
 import { firstNameWithInitials } from '../../utils/formatting';
@@ -9,6 +10,8 @@ interface Props {
   slug: string;
   highlightZones?: boolean;
 }
+
+const FLIP_DURATION_MS = 1500;
 
 function rankZone(rank: number): string {
   if (rank === 1) return 'border-l-accent-yellow';
@@ -36,6 +39,51 @@ function rankBadge(rank: number) {
 }
 
 export function LeaderboardTable({ rows, slug, highlightZones = true }: Props) {
+  const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
+  const prevPositions = useRef(new Map<string, number>());
+
+  useLayoutEffect(() => {
+    const newPositions = new Map<string, number>();
+    rowRefs.current.forEach((el, id) => {
+      newPositions.set(id, el.getBoundingClientRect().top);
+    });
+
+    rowRefs.current.forEach((el, id) => {
+      const prev = prevPositions.current.get(id);
+      const next = newPositions.get(id);
+      if (prev === undefined || next === undefined || prev === next) return;
+      const delta = prev - next;
+      el.animate(
+        [
+          { transform: `translateY(${delta}px)` },
+          { transform: 'translateY(0)' },
+        ],
+        {
+          duration: FLIP_DURATION_MS,
+          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+          fill: 'both',
+        },
+      );
+      const accent =
+        delta > 0
+          ? 'rgba(34, 197, 94, 0.18)'
+          : 'rgba(239, 68, 68, 0.18)';
+      el.animate(
+        [
+          { backgroundColor: accent },
+          { backgroundColor: 'transparent' },
+        ],
+        {
+          duration: FLIP_DURATION_MS + 400,
+          easing: 'ease-out',
+          fill: 'both',
+        },
+      );
+    });
+
+    prevPositions.current = newPositions;
+  }, [rows]);
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -57,6 +105,10 @@ export function LeaderboardTable({ rows, slug, highlightZones = true }: Props) {
           {rows.map((r) => (
             <tr
               key={r.player._id}
+              ref={(el) => {
+                if (el) rowRefs.current.set(r.player._id, el);
+                else rowRefs.current.delete(r.player._id);
+              }}
               className={clsx(
                 'border-l-2 transition-colors hover:bg-bg-hover',
                 highlightZones && rankZone(r.rank),

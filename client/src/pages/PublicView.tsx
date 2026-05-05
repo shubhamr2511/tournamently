@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api, getErrorMessage } from '../services/api';
 import { Card } from '../components/ui/Card';
@@ -9,35 +9,46 @@ import { LeaderboardTable } from '../components/leaderboard/LeaderboardTable';
 import { MatchCard } from '../components/match/MatchCard';
 import type { IPublicTournamentPayload } from '../types';
 
-const POLL_MS = 30000;
+const POLL_MS = 10000;
 
 export function PublicView() {
   const { slug = '' } = useParams();
   const [data, setData] = useState<IPublicTournamentPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState('');
+  const cancelRef = useRef(false);
 
-  useEffect(() => {
-    let cancel = false;
-    let timer: ReturnType<typeof setInterval>;
-    function load() {
+  const load = useCallback(
+    (manual = false) => {
+      if (manual) setRefreshing(true);
       api
         .get(`/public/${slug}`)
         .then(({ data }) => {
-          if (!cancel) setData(data);
+          if (!cancelRef.current) setData(data);
         })
         .catch((err) => {
-          if (!cancel) setError(getErrorMessage(err));
+          if (!cancelRef.current) setError(getErrorMessage(err));
         })
-        .finally(() => !cancel && setLoading(false));
-    }
+        .finally(() => {
+          if (cancelRef.current) return;
+          setLoading(false);
+          if (manual) setRefreshing(false);
+        });
+    },
+    [slug],
+  );
+
+  useEffect(() => {
+    cancelRef.current = false;
     load();
-    timer = setInterval(load, POLL_MS);
+    const timer = setInterval(load, POLL_MS);
     return () => {
-      cancel = true;
+      cancelRef.current = true;
       clearInterval(timer);
     };
-  }, [slug]);
+  }, [load]);
 
   if (loading) return <PageLoader label="Connecting…" />;
   if (error || !data)
@@ -48,6 +59,22 @@ export function PublicView() {
     );
 
   const { tournament, leaderboard, todayMatches, recentResults, upcomingMatches, featuredMatches, playoffs, stats } = data;
+
+  const trimmedSearch = search.trim().toLowerCase();
+  const matchHasGamerTag = (m: typeof todayMatches[number]) => {
+    const a = typeof m.playerA === 'object' ? m.playerA?.gamerTag ?? '' : '';
+    const b = typeof m.playerB === 'object' ? m.playerB?.gamerTag ?? '' : '';
+    return (
+      a.toLowerCase().includes(trimmedSearch) ||
+      b.toLowerCase().includes(trimmedSearch)
+    );
+  };
+  const filterMatches = <T extends typeof todayMatches[number]>(list: T[]) =>
+    trimmedSearch ? list.filter(matchHasGamerTag) : list;
+  const filteredToday = filterMatches(todayMatches);
+  const filteredUpcoming = filterMatches(upcomingMatches);
+  const filteredRecent = filterMatches(recentResults);
+  const filteredFeatured = filterMatches(featuredMatches);
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-8">
@@ -83,7 +110,37 @@ export function PublicView() {
       </header>
 
       <section>
-        <SectionTitle>Leaderboard</SectionTitle>
+        <div className="flex flex-wrap items-center justify-between mb-3 gap-3">
+          <SectionTitle noMargin>Leaderboard</SectionTitle>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => load(true)}
+              disabled={refreshing}
+              className="font-display tracking-widest uppercase text-xs px-3 py-1.5 border border-border hover:border-accent-blue hover:text-accent-blue transition-colors clip-angled whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              aria-label="Refresh leaderboard"
+            >
+              <span
+                className={`inline-block ${refreshing ? 'animate-spin' : ''}`}
+                aria-hidden="true"
+              >
+                ↻
+              </span>
+              {refreshing ? 'Refreshing…' : 'Refresh'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                document
+                  .getElementById('matches')
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+              className="font-display tracking-widest uppercase text-xs px-3 py-1.5 border border-border hover:border-accent-yellow hover:text-accent-yellow transition-colors clip-angled whitespace-nowrap"
+            >
+              Jump to matches ↓
+            </button>
+          </div>
+        </div>
         {leaderboard.length === 0 ? (
           <EmptyState title="No matches yet" />
         ) : (
@@ -93,57 +150,97 @@ export function PublicView() {
         )}
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <section>
-          <SectionTitle>Today's Matches</SectionTitle>
-          {todayMatches.length === 0 ? (
-            <EmptyState title="Nothing today" />
-          ) : (
-            <div className="grid grid-cols-1 gap-3">
-              {todayMatches.map((m) => (
-                <MatchCard key={m._id} match={m} slug={slug} />
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section>
-          <SectionTitle>Upcoming</SectionTitle>
-          {upcomingMatches.length === 0 ? (
-            <EmptyState title="No upcoming matches" />
-          ) : (
-            <div className="grid grid-cols-1 gap-3">
-              {upcomingMatches.map((m) => (
-                <MatchCard key={m._id} match={m} slug={slug} />
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
-
-      <section>
-        <SectionTitle>Recent Results</SectionTitle>
-        {recentResults.length === 0 ? (
-          <EmptyState title="No completed matches yet" />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {recentResults.map((m) => (
-              <MatchCard key={m._id} match={m} slug={slug} />
-            ))}
+      <div id="matches" className="space-y-6 scroll-mt-6">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search matches by gamertag…"
+              className="font-mono text-xs px-3 py-1.5 pr-7 border border-border bg-bg-secondary focus:border-accent-yellow focus:outline-none clip-angled w-full placeholder:text-text-muted"
+              aria-label="Search matches by gamertag"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-accent-yellow text-sm leading-none"
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            )}
           </div>
+          {trimmedSearch && (
+            <span className="font-mono text-[11px] text-text-muted">
+              {filteredToday.length + filteredUpcoming.length + filteredRecent.length + filteredFeatured.length}{' '}
+              match
+              {filteredToday.length + filteredUpcoming.length + filteredRecent.length + filteredFeatured.length === 1
+                ? ''
+                : 'es'}
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <section>
+            <SectionTitle>Today's Matches</SectionTitle>
+            {filteredToday.length === 0 ? (
+              <EmptyState
+                title={trimmedSearch ? 'No matches' : 'Nothing today'}
+              />
+            ) : (
+              <div className="grid grid-cols-1 gap-3">
+                {filteredToday.map((m) => (
+                  <MatchCard key={m._id} match={m} slug={slug} showPlayerName />
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section>
+            <SectionTitle>Upcoming</SectionTitle>
+            {filteredUpcoming.length === 0 ? (
+              <EmptyState
+                title={trimmedSearch ? 'No matches' : 'No upcoming matches'}
+              />
+            ) : (
+              <div className="grid grid-cols-1 gap-3">
+                {filteredUpcoming.map((m) => (
+                  <MatchCard key={m._id} match={m} slug={slug} showPlayerName />
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+
+        <section>
+          <SectionTitle>Recent Results</SectionTitle>
+          {filteredRecent.length === 0 ? (
+            <EmptyState
+              title={trimmedSearch ? 'No matches' : 'No completed matches yet'}
+            />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {filteredRecent.map((m) => (
+                <MatchCard key={m._id} match={m} slug={slug} />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {(featuredMatches.length > 0 || trimmedSearch) && filteredFeatured.length > 0 && (
+          <section>
+            <SectionTitle>Featured</SectionTitle>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {filteredFeatured.map((m) => (
+                <MatchCard key={m._id} match={m} slug={slug} />
+              ))}
+            </div>
+          </section>
         )}
-      </section>
-
-      {featuredMatches.length > 0 && (
-        <section>
-          <SectionTitle>Featured</SectionTitle>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {featuredMatches.map((m) => (
-              <MatchCard key={m._id} match={m} slug={slug} />
-            ))}
-          </div>
-        </section>
-      )}
+      </div>
 
       {playoffs && playoffs.length > 0 && (
         <section>
@@ -164,9 +261,19 @@ export function PublicView() {
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function SectionTitle({
+  children,
+  noMargin,
+}: {
+  children: React.ReactNode;
+  noMargin?: boolean;
+}) {
   return (
-    <h2 className="font-display tracking-widest uppercase text-text-secondary text-sm mb-3 flex items-center gap-2">
+    <h2
+      className={`font-display tracking-widest uppercase text-text-secondary text-sm flex items-center gap-2 ${
+        noMargin ? 'flex-1' : 'mb-3'
+      }`}
+    >
       <span className="h-px flex-1 bg-gradient-to-r from-border to-transparent max-w-[40px]" />
       {children}
       <span className="h-px flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
