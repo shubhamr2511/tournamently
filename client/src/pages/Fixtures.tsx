@@ -4,6 +4,7 @@ import { api, getErrorMessage } from '../services/api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Select } from '../components/ui/Select';
+import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { PageLoader } from '../components/ui/Spinner';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -27,8 +28,21 @@ export function Fixtures() {
   const { tournament } = useTournament(slug);
   const isAdmin = isAdminOf(slug);
   const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useState('');
   const filters = statusFilter ? { status: statusFilter } : undefined;
   const { matches, loading, reload } = useMatches(tournament?._id, filters);
+
+  const trimmedSearch = search.trim().toLowerCase();
+  const visibleMatches = trimmedSearch
+    ? matches.filter((m) => {
+        const a = typeof m.playerA === 'object' ? m.playerA?.name ?? '' : '';
+        const b = typeof m.playerB === 'object' ? m.playerB?.name ?? '' : '';
+        return (
+          a.toLowerCase().includes(trimmedSearch) ||
+          b.toLowerCase().includes(trimmedSearch)
+        );
+      })
+    : matches;
 
   if (!session && !isAdmin) {
     navigate(`/t/${slug}/login`);
@@ -37,7 +51,7 @@ export function Fixtures() {
 
   const grouped = useMemo(() => {
     const map = new Map<string, IMatch[]>();
-    for (const m of matches) {
+    for (const m of visibleMatches) {
       const key = m.scheduledDate
         ? new Date(m.scheduledDate).toISOString().slice(0, 10)
         : 'unscheduled';
@@ -45,7 +59,7 @@ export function Fixtures() {
       map.get(key)!.push(m);
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [matches]);
+  }, [visibleMatches]);
 
   async function generate() {
     if (!tournament) return;
@@ -83,10 +97,19 @@ export function Fixtures() {
         <div>
           <h1 className="font-display text-3xl tracking-wider">Fixtures</h1>
           <p className="text-text-secondary text-sm">
-            {matches.length} match{matches.length === 1 ? '' : 'es'}
+            {visibleMatches.length} match{visibleMatches.length === 1 ? '' : 'es'}
+            {trimmedSearch && matches.length !== visibleMatches.length && (
+              <span className="text-text-muted"> · of {matches.length}</span>
+            )}
           </p>
         </div>
         <div className="flex flex-wrap gap-2 items-end">
+          <Input
+            label="Search"
+            placeholder="player name…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
           <Select
             label="Filter"
             value={statusFilter}
@@ -127,6 +150,11 @@ export function Fixtures() {
               <Button onClick={generate}>Generate Fixtures</Button>
             ) : undefined
           }
+        />
+      ) : visibleMatches.length === 0 ? (
+        <EmptyState
+          title="No matches"
+          description={`No player name matches "${search}".`}
         />
       ) : (
         <div className="space-y-6">

@@ -25,6 +25,11 @@ export function MatchCard({ match, slug, isAdmin, showPlayerName }: Props) {
   const bWon = b && winnerId === b._id;
   const featured = match.result?.isFeatured;
   const upset = match.result?.isUpset;
+  const displayScore = match.result
+    ? bWon
+      ? match.result.score.split('-').reverse().join('-')
+      : match.result.score
+    : null;
 
   const target = isAdmin
     ? `/t/${slug}/match/${match._id}`
@@ -73,7 +78,7 @@ export function MatchCard({ match, slug, isAdmin, showPlayerName }: Props) {
           <div className="text-center">
             {match.result ? (
               <div className="font-display text-2xl text-accent-yellow">
-                {match.result.score}
+                {displayScore}
               </div>
             ) : (
               <div className="font-display text-xl text-text-muted tracking-widest">

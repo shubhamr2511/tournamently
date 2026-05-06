@@ -28,8 +28,8 @@ export function MatchCenter() {
   const { matches, loading } = useMatches(tournament?._id, filters);
   const filtered = search
     ? matches.filter((m) => {
-        const a = typeof m.playerA === 'object' ? m.playerA.gamerTag : '';
-        const b = typeof m.playerB === 'object' ? m.playerB.gamerTag : '';
+        const a = typeof m.playerA === 'object' ? m.playerA.name : '';
+        const b = typeof m.playerB === 'object' ? m.playerB.name : '';
         const q = search.toLowerCase();
         return a.toLowerCase().includes(q) || b.toLowerCase().includes(q);
       })
@@ -62,7 +62,7 @@ export function MatchCenter() {
         />
         <Input
           label="Search"
-          placeholder="gamer tag…"
+          placeholder="player name…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
