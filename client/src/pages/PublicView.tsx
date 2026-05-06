@@ -9,7 +9,7 @@ import { LeaderboardTable } from '../components/leaderboard/LeaderboardTable';
 import { MatchCard } from '../components/match/MatchCard';
 import type { IPublicTournamentPayload } from '../types';
 
-const POLL_MS = 10000;
+const POLL_MS = 5000;
 
 export function PublicView() {
   const { slug = '' } = useParams();

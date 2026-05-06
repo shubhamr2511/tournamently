@@ -38,36 +38,103 @@ function rankBadge(rank: number) {
   );
 }
 
+interface RowSnapshot {
+  rank: number;
+  matchesPlayed: number;
+  wins: number;
+  losses: number;
+  bonusPoints: number;
+  perfectRounds: number;
+  fastWins: number;
+  gameDiff: number;
+  winPercentage: number;
+}
+
+function snapshotOf(r: ILeaderboardRow): RowSnapshot {
+  return {
+    rank: r.rank,
+    matchesPlayed: r.matchesPlayed,
+    wins: r.wins,
+    losses: r.losses,
+    bonusPoints: r.bonusPoints,
+    perfectRounds: r.perfectRounds,
+    fastWins: r.fastWins,
+    gameDiff: r.gameDiff,
+    winPercentage: r.winPercentage,
+  };
+}
+
+function snapshotsEqual(a: RowSnapshot, b: RowSnapshot): boolean {
+  return (
+    a.rank === b.rank &&
+    a.matchesPlayed === b.matchesPlayed &&
+    a.wins === b.wins &&
+    a.losses === b.losses &&
+    a.bonusPoints === b.bonusPoints &&
+    a.perfectRounds === b.perfectRounds &&
+    a.fastWins === b.fastWins &&
+    a.gameDiff === b.gameDiff &&
+    a.winPercentage === b.winPercentage
+  );
+}
+
 export function LeaderboardTable({ rows, slug, highlightZones = true }: Props) {
   const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
   const prevPositions = useRef(new Map<string, number>());
+  const prevSnapshots = useRef(new Map<string, RowSnapshot>());
 
   useLayoutEffect(() => {
     const newPositions = new Map<string, number>();
     rowRefs.current.forEach((el, id) => {
-      newPositions.set(id, el.getBoundingClientRect().top);
+      newPositions.set(id, el.offsetTop);
     });
 
-    rowRefs.current.forEach((el, id) => {
-      const prev = prevPositions.current.get(id);
-      const next = newPositions.get(id);
-      if (prev === undefined || next === undefined || prev === next) return;
-      const delta = prev - next;
-      el.animate(
-        [
-          { transform: `translateY(${delta}px)` },
-          { transform: 'translateY(0)' },
-        ],
-        {
-          duration: FLIP_DURATION_MS,
-          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-          fill: 'both',
-        },
-      );
-      const accent =
-        delta > 0
-          ? 'rgba(34, 197, 94, 0.18)'
-          : 'rgba(239, 68, 68, 0.18)';
+    const newSnapshots = new Map<string, RowSnapshot>();
+    rows.forEach((r) => {
+      newSnapshots.set(r.player._id, snapshotOf(r));
+    });
+
+    rows.forEach((r) => {
+      const id = r.player._id;
+      const el = rowRefs.current.get(id);
+      if (!el) return;
+      const prevSnap = prevSnapshots.current.get(id);
+      const newSnap = newSnapshots.get(id);
+      if (!prevSnap || !newSnap) return;
+      if (snapshotsEqual(prevSnap, newSnap)) return;
+
+      const prevPos = prevPositions.current.get(id);
+      const newPos = newPositions.get(id);
+      if (
+        prevPos !== undefined &&
+        newPos !== undefined &&
+        prevPos !== newPos
+      ) {
+        const delta = prevPos - newPos;
+        el.animate(
+          [
+            { transform: `translateY(${delta}px)` },
+            { transform: 'translateY(0)' },
+          ],
+          {
+            duration: FLIP_DURATION_MS,
+            easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+            fill: 'both',
+          },
+        );
+      }
+
+      const wonMore = newSnap.wins > prevSnap.wins;
+      const lostMore = newSnap.losses > prevSnap.losses;
+      const rankImproved = newSnap.rank < prevSnap.rank;
+      const rankDropped = newSnap.rank > prevSnap.rank;
+      const positive = wonMore || (!lostMore && rankImproved);
+      const negative = lostMore || (!wonMore && rankDropped);
+      const accent = positive
+        ? 'rgba(34, 197, 94, 0.18)'
+        : negative
+          ? 'rgba(239, 68, 68, 0.18)'
+          : 'rgba(234, 179, 8, 0.18)';
       el.animate(
         [
           { backgroundColor: accent },
@@ -82,6 +149,7 @@ export function LeaderboardTable({ rows, slug, highlightZones = true }: Props) {
     });
 
     prevPositions.current = newPositions;
+    prevSnapshots.current = newSnapshots;
   }, [rows]);
 
   return (

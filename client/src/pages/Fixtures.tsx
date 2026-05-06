@@ -207,7 +207,7 @@ function FixtureRow({
 }) {
   return (
     <div className="space-y-2">
-      <MatchCard match={match} slug={slug} isAdmin={isAdmin} />
+      <MatchCard match={match} slug={slug} isAdmin={isAdmin} showPlayerName />
       {isAdmin && (
         <div className="flex items-center gap-2 text-xs text-text-muted px-2">
           <span>reschedule:</span>

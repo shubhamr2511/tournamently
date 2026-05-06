@@ -79,7 +79,7 @@ export function MatchCenter() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {filtered.map((m) => (
-            <MatchCard key={m._id} match={m} slug={slug} isAdmin={isAdmin} />
+            <MatchCard key={m._id} match={m} slug={slug} isAdmin={isAdmin} showPlayerName />
           ))}
         </div>
       )}
