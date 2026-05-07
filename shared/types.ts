@@ -177,6 +177,31 @@ export interface ILeaderboardSnapshotSummary {
   createdAt: string;
 }
 
+export interface IStandingsHistoryRow {
+  player: {
+    _id: string;
+    gamerTag: string;
+    name: string;
+    character?: string;
+  };
+  rank: number;
+  matchesPlayed: number;
+  wins: number;
+  losses: number;
+  bonusPoints: number;
+  winPercentage: number;
+}
+
+export interface IStandingsHistorySnapshot {
+  _id: string;
+  capturedAt: string;
+  rows: IStandingsHistoryRow[];
+}
+
+export interface IStandingsHistoryResponse {
+  snapshots: IStandingsHistorySnapshot[];
+}
+
 export interface IPublicTournamentPayload {
   tournament: ITournament;
   leaderboard: ILeaderboardRow[];

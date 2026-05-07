@@ -52,7 +52,7 @@ publicRouter.get(
       })
         .populate('playerA playerB')
         .sort({ scheduledDate: 1, matchNumber: 1 })
-        .limit(10),
+        .limit(30),
       Match.find({
         tournament: tid,
         status: 'completed',
@@ -104,6 +104,49 @@ publicRouter.get(
         playersCount: players.length,
       },
     });
+  }),
+);
+
+publicRouter.get(
+  '/:slug/standings-history',
+  asyncHandler(async (req, res) => {
+    const t = await Tournament.findOne({ slug: req.params.slug });
+    if (!t) throw new AppError('Tournament not found', 404);
+    const snapshots = await LeaderboardSnapshot.find({ tournament: t._id })
+      .sort({ capturedAt: 1 })
+      .populate({
+        path: 'rows.player',
+        select: 'gamerTag name character isActive',
+      });
+    const payload = snapshots.map((s) => ({
+      _id: String(s._id),
+      capturedAt: s.capturedAt,
+      rows: s.rows
+        .filter((r) => r.player && typeof r.player === 'object')
+        .map((r) => {
+          const p = r.player as unknown as {
+            _id: unknown;
+            gamerTag: string;
+            name: string;
+            character?: string;
+          };
+          return {
+            player: {
+              _id: String(p._id),
+              gamerTag: p.gamerTag,
+              name: p.name,
+              character: p.character,
+            },
+            rank: r.rank,
+            matchesPlayed: r.matchesPlayed,
+            wins: r.wins,
+            losses: r.losses,
+            bonusPoints: r.bonusPoints,
+            winPercentage: r.winPercentage,
+          };
+        }),
+    }));
+    res.json({ snapshots: payload });
   }),
 );
 

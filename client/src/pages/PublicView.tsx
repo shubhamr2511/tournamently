@@ -6,19 +6,38 @@ import { Badge } from '../components/ui/Badge';
 import { PageLoader } from '../components/ui/Spinner';
 import { EmptyState } from '../components/ui/EmptyState';
 import { LeaderboardTable } from '../components/leaderboard/LeaderboardTable';
+import { StandingsHistoryChart } from '../components/leaderboard/StandingsHistoryChart';
 import { MatchCard } from '../components/match/MatchCard';
-import type { IPublicTournamentPayload } from '../types';
+import type {
+  IPublicTournamentPayload,
+  IStandingsHistoryResponse,
+  IStandingsHistorySnapshot,
+} from '../types';
 
 const POLL_MS = 5000;
 
 export function PublicView() {
   const { slug = '' } = useParams();
   const [data, setData] = useState<IPublicTournamentPayload | null>(null);
+  const [history, setHistory] = useState<IStandingsHistorySnapshot[] | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const cancelRef = useRef(false);
+
+  const loadHistory = useCallback(() => {
+    api
+      .get<IStandingsHistoryResponse>(`/public/${slug}/standings-history`)
+      .then(({ data }) => {
+        if (!cancelRef.current) setHistory(data.snapshots);
+      })
+      .catch(() => {
+        /* non-fatal: chart just won't render */
+      });
+  }, [slug]);
 
   const load = useCallback(
     (manual = false) => {
@@ -34,21 +53,25 @@ export function PublicView() {
         .finally(() => {
           if (cancelRef.current) return;
           setLoading(false);
-          if (manual) setRefreshing(false);
+          if (manual) {
+            setRefreshing(false);
+            loadHistory();
+          }
         });
     },
-    [slug],
+    [slug, loadHistory],
   );
 
   useEffect(() => {
     cancelRef.current = false;
     load();
+    loadHistory();
     const timer = setInterval(load, POLL_MS);
     return () => {
       cancelRef.current = true;
       clearInterval(timer);
     };
-  }, [load]);
+  }, [load, loadHistory]);
 
   if (loading) return <PageLoader label="Connecting…" />;
   if (error || !data)
@@ -58,10 +81,10 @@ export function PublicView() {
       </div>
     );
 
-  const { tournament, leaderboard, todayMatches, recentResults, upcomingMatches, featuredMatches, playoffs, stats } = data;
+  const { tournament, leaderboard, recentResults, upcomingMatches, featuredMatches, playoffs, stats } = data;
 
   const trimmedSearch = search.trim().toLowerCase();
-  const matchHasGamerTag = (m: typeof todayMatches[number]) => {
+  const matchHasGamerTag = (m: typeof upcomingMatches[number]) => {
     const a = typeof m.playerA === 'object' ? m.playerA?.gamerTag ?? '' : '';
     const b = typeof m.playerB === 'object' ? m.playerB?.gamerTag ?? '' : '';
     return (
@@ -69,9 +92,8 @@ export function PublicView() {
       b.toLowerCase().includes(trimmedSearch)
     );
   };
-  const filterMatches = <T extends typeof todayMatches[number]>(list: T[]) =>
+  const filterMatches = <T extends typeof upcomingMatches[number]>(list: T[]) =>
     trimmedSearch ? list.filter(matchHasGamerTag) : list;
-  const filteredToday = filterMatches(todayMatches);
   const filteredUpcoming = filterMatches(upcomingMatches);
   const filteredRecent = filterMatches(recentResults);
   const filteredFeatured = filterMatches(featuredMatches);
@@ -150,6 +172,15 @@ export function PublicView() {
         )}
       </section>
 
+      {history && history.length >= 2 && (
+        <section>
+          <SectionTitle>Standings History</SectionTitle>
+          <Card className="p-4 sm:p-6">
+            <StandingsHistoryChart snapshots={history} slug={slug} />
+          </Card>
+        </section>
+      )}
+
       <div id="matches" className="space-y-6 scroll-mt-6">
         <div className="flex items-center gap-3">
           <div className="relative flex-1 max-w-sm">
@@ -174,46 +205,29 @@ export function PublicView() {
           </div>
           {trimmedSearch && (
             <span className="font-mono text-[11px] text-text-muted">
-              {filteredToday.length + filteredUpcoming.length + filteredRecent.length + filteredFeatured.length}{' '}
+              {filteredUpcoming.length + filteredRecent.length + filteredFeatured.length}{' '}
               match
-              {filteredToday.length + filteredUpcoming.length + filteredRecent.length + filteredFeatured.length === 1
+              {filteredUpcoming.length + filteredRecent.length + filteredFeatured.length === 1
                 ? ''
                 : 'es'}
             </span>
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <section>
-            <SectionTitle>Today's Matches</SectionTitle>
-            {filteredToday.length === 0 ? (
-              <EmptyState
-                title={trimmedSearch ? 'No matches' : 'Nothing today'}
-              />
-            ) : (
-              <div className="grid grid-cols-1 gap-3">
-                {filteredToday.map((m) => (
-                  <MatchCard key={m._id} match={m} slug={slug} showPlayerName />
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section>
-            <SectionTitle>Upcoming</SectionTitle>
-            {filteredUpcoming.length === 0 ? (
-              <EmptyState
-                title={trimmedSearch ? 'No matches' : 'No upcoming matches'}
-              />
-            ) : (
-              <div className="grid grid-cols-1 gap-3">
-                {filteredUpcoming.map((m) => (
-                  <MatchCard key={m._id} match={m} slug={slug} showPlayerName />
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
+        <section>
+          <SectionTitle>Upcoming</SectionTitle>
+          {filteredUpcoming.length === 0 ? (
+            <EmptyState
+              title={trimmedSearch ? 'No matches' : 'No upcoming matches'}
+            />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {filteredUpcoming.map((m) => (
+                <MatchCard key={m._id} match={m} slug={slug} showPlayerName />
+              ))}
+            </div>
+          )}
+        </section>
 
         <section>
           <SectionTitle>Recent Results</SectionTitle>
