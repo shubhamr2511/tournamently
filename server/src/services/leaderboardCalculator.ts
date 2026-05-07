@@ -51,6 +51,8 @@ export function computeLeaderboard(
   const acc = new Map<string, Acc>();
   for (const p of players) acc.set(String(p._id), empty());
 
+  const perfectBonus = tournament.scoring?.perfectRoundBonus ?? 1;
+
   for (const m of matches) {
     if (m.status !== 'completed' || !m.result) continue;
     const aId = String(m.playerA);
@@ -75,10 +77,17 @@ export function computeLeaderboard(
       aAcc.h2h[bId] = 'loss';
     }
 
-    aAcc.bonusPoints += m.result.playerAStats?.bonusPoints || 0;
-    bAcc.bonusPoints += m.result.playerBStats?.bonusPoints || 0;
-    aAcc.perfectRounds += m.result.playerAStats?.perfectRounds || 0;
-    bAcc.perfectRounds += m.result.playerBStats?.perfectRounds || 0;
+    const aPerfect = m.result.playerAStats?.perfectRounds || 0;
+    const bPerfect = m.result.playerBStats?.perfectRounds || 0;
+
+    // Each perfect round suffered penalises the loser by the same amount the
+    // winner is rewarded — keeps the +X / -X invariant the user defined.
+    aAcc.bonusPoints +=
+      (m.result.playerAStats?.bonusPoints || 0) - bPerfect * perfectBonus;
+    bAcc.bonusPoints +=
+      (m.result.playerBStats?.bonusPoints || 0) - aPerfect * perfectBonus;
+    aAcc.perfectRounds += aPerfect;
+    bAcc.perfectRounds += bPerfect;
     aAcc.fastWins += m.result.playerAStats?.fastWins || 0;
     bAcc.fastWins += m.result.playerBStats?.fastWins || 0;
 
