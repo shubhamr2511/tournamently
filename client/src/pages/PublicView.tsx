@@ -9,6 +9,7 @@ import { LeaderboardTable } from '../components/leaderboard/LeaderboardTable';
 import { StandingsHistoryChart } from '../components/leaderboard/StandingsHistoryChart';
 import { MatchCard } from '../components/match/MatchCard';
 import type {
+  IMatch,
   IPublicTournamentPayload,
   IStandingsHistoryResponse,
   IStandingsHistorySnapshot,
@@ -26,7 +27,15 @@ export function PublicView() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
+  const displayedRef = useRef<IMatch[]>([]);
+  const exitingRef = useRef<Set<string>>(new Set());
+  const exitTimers = useRef<Map<string, number>>(new Map());
+  const [, forceRender] = useState(0);
   const cancelRef = useRef(false);
+  const leaderboardRef = useRef<HTMLDivElement>(null);
+  const [leaderboardHeight, setLeaderboardHeight] = useState<number | null>(
+    null,
+  );
 
   const loadHistory = useCallback(() => {
     api
@@ -70,8 +79,75 @@ export function PublicView() {
     return () => {
       cancelRef.current = true;
       clearInterval(timer);
+      for (const t of exitTimers.current.values()) window.clearTimeout(t);
+      exitTimers.current.clear();
     };
   }, [load, loadHistory]);
+
+  useEffect(() => {
+    if (!data) return;
+    const incoming = data.upcomingMatches;
+    const incomingIds = new Set(incoming.map((m) => m._id));
+    const incomingMap = new Map(incoming.map((m) => [m._id, m]));
+    const prev = displayedRef.current;
+
+    let mutated = false;
+
+    for (const m of prev) {
+      if (!incomingIds.has(m._id) && !exitingRef.current.has(m._id)) {
+        const id = m._id;
+        exitingRef.current.add(id);
+        mutated = true;
+        if (!exitTimers.current.has(id)) {
+          const handle = window.setTimeout(() => {
+            displayedRef.current = displayedRef.current.filter(
+              (x) => x._id !== id,
+            );
+            exitingRef.current.delete(id);
+            exitTimers.current.delete(id);
+            forceRender((v) => v + 1);
+          }, 1500);
+          exitTimers.current.set(id, handle);
+        }
+      }
+    }
+
+    const seen = new Set<string>();
+    const merged: IMatch[] = [];
+    for (const m of prev) {
+      const replaced = incomingMap.get(m._id);
+      if (replaced) {
+        merged.push(replaced);
+        seen.add(m._id);
+      } else {
+        merged.push(m);
+      }
+    }
+    for (const m of incoming) {
+      if (!seen.has(m._id)) merged.push(m);
+    }
+
+    const sameLength = merged.length === prev.length;
+    const sameOrder =
+      sameLength && merged.every((m, i) => m === prev[i]);
+    if (!sameOrder) {
+      displayedRef.current = merged;
+      mutated = true;
+    }
+    if (mutated) forceRender((v) => v + 1);
+  }, [data]);
+
+  useEffect(() => {
+    const el = leaderboardRef.current;
+    if (!el) return;
+    const update = () => {
+      setLeaderboardHeight(el.getBoundingClientRect().height);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [data]);
 
   if (loading) return <PageLoader label="Connecting…" />;
   if (error || !data)
@@ -94,12 +170,15 @@ export function PublicView() {
   };
   const filterMatches = <T extends typeof upcomingMatches[number]>(list: T[]) =>
     trimmedSearch ? list.filter(matchHasGamerTag) : list;
-  const filteredUpcoming = filterMatches(upcomingMatches);
+  const filteredUpcoming = filterMatches(displayedRef.current);
   const filteredRecent = filterMatches(recentResults);
   const filteredFeatured = filterMatches(featuredMatches);
+  const visibleUpcomingCount = filteredUpcoming.filter(
+    (m) => !exitingRef.current.has(m._id),
+  ).length;
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-8">
+    <div className="w-full p-6 space-y-8">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="font-display tracking-widest uppercase text-text-muted text-xs">
@@ -131,46 +210,89 @@ export function PublicView() {
         </div>
       </header>
 
-      <section>
-        <div className="flex flex-wrap items-center justify-between mb-3 gap-3">
-          <SectionTitle noMargin>Leaderboard</SectionTitle>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => load(true)}
-              disabled={refreshing}
-              className="font-display tracking-widest uppercase text-xs px-3 py-1.5 border border-border hover:border-accent-blue hover:text-accent-blue transition-colors clip-angled whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-              aria-label="Refresh leaderboard"
-            >
-              <span
-                className={`inline-block ${refreshing ? 'animate-spin' : ''}`}
-                aria-hidden="true"
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <section className="lg:col-span-2 min-w-0">
+          <div className="flex flex-wrap items-center justify-between mb-3 gap-3">
+            <SectionTitle noMargin>Leaderboard</SectionTitle>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => load(true)}
+                disabled={refreshing}
+                className="font-display tracking-widest uppercase text-xs px-3 py-1.5 border border-border hover:border-accent-blue hover:text-accent-blue transition-colors clip-angled whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                aria-label="Refresh leaderboard"
               >
-                ↻
-              </span>
-              {refreshing ? 'Refreshing…' : 'Refresh'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                document
-                  .getElementById('matches')
-                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }}
-              className="font-display tracking-widest uppercase text-xs px-3 py-1.5 border border-border hover:border-accent-yellow hover:text-accent-yellow transition-colors clip-angled whitespace-nowrap"
-            >
-              Jump to matches ↓
-            </button>
+                <span
+                  className={`inline-block ${refreshing ? 'animate-spin' : ''}`}
+                  aria-hidden="true"
+                >
+                  ↻
+                </span>
+                {refreshing ? 'Refreshing…' : 'Refresh'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  document
+                    .getElementById('matches')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="font-display tracking-widest uppercase text-xs px-3 py-1.5 border border-border hover:border-accent-yellow hover:text-accent-yellow transition-colors clip-angled whitespace-nowrap"
+              >
+                Jump to matches ↓
+              </button>
+            </div>
           </div>
-        </div>
-        {leaderboard.length === 0 ? (
-          <EmptyState title="No matches yet" />
-        ) : (
-          <Card className="overflow-hidden">
-            <LeaderboardTable rows={leaderboard} slug={slug} />
-          </Card>
-        )}
-      </section>
+          {leaderboard.length === 0 ? (
+            <EmptyState title="No matches yet" />
+          ) : (
+            <div ref={leaderboardRef}>
+              <Card className="overflow-hidden">
+                <LeaderboardTable rows={leaderboard} slug={slug} />
+              </Card>
+            </div>
+          )}
+        </section>
+
+        <section className="lg:col-span-1 min-w-0">
+          <SectionTitle>
+            Upcoming
+            {visibleUpcomingCount > 0 && (
+              <span className="font-mono text-[10px] text-text-muted ml-2 normal-case tracking-normal">
+                · {visibleUpcomingCount}
+              </span>
+            )}
+          </SectionTitle>
+          {visibleUpcomingCount === 0 && filteredUpcoming.length === 0 ? (
+            <EmptyState
+              title={trimmedSearch ? 'No matches' : 'No upcoming matches'}
+            />
+          ) : (
+            <div
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-3 lg:min-h-[calc(100vh-8rem)] lg:max-h-[var(--leaderboard-h,calc(100vh-8rem))] lg:overflow-y-auto lg:pr-1"
+              style={
+                leaderboardHeight
+                  ? ({
+                      ['--leaderboard-h' as string]: `${leaderboardHeight}px`,
+                    } as React.CSSProperties)
+                  : undefined
+              }
+            >
+              {filteredUpcoming.map((m) => {
+                const isExiting = exitingRef.current.has(m._id);
+                return (
+                  <div
+                    key={m._id}
+                    className={isExiting ? 'match-exit' : undefined}
+                  >
+                    <MatchCard match={m} slug={slug} showPlayerName />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
 
       {history && history.length >= 2 && (
         <section>
@@ -205,29 +327,14 @@ export function PublicView() {
           </div>
           {trimmedSearch && (
             <span className="font-mono text-[11px] text-text-muted">
-              {filteredUpcoming.length + filteredRecent.length + filteredFeatured.length}{' '}
+              {filteredRecent.length + filteredFeatured.length}{' '}
               match
-              {filteredUpcoming.length + filteredRecent.length + filteredFeatured.length === 1
+              {filteredRecent.length + filteredFeatured.length === 1
                 ? ''
                 : 'es'}
             </span>
           )}
         </div>
-
-        <section>
-          <SectionTitle>Upcoming</SectionTitle>
-          {filteredUpcoming.length === 0 ? (
-            <EmptyState
-              title={trimmedSearch ? 'No matches' : 'No upcoming matches'}
-            />
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {filteredUpcoming.map((m) => (
-                <MatchCard key={m._id} match={m} slug={slug} showPlayerName />
-              ))}
-            </div>
-          )}
-        </section>
 
         <section>
           <SectionTitle>Recent Results</SectionTitle>
