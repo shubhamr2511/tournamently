@@ -4,6 +4,9 @@ import type { ILeaderboardRow } from '../types';
 
 export function useLeaderboard(tournamentId?: string) {
   const [rows, setRows] = useState<ILeaderboardRow[]>([]);
+  const [snapshotCapturedAt, setSnapshotCapturedAt] = useState<string | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [key, setKey] = useState(0);
@@ -15,7 +18,14 @@ export function useLeaderboard(tournamentId?: string) {
     api
       .get(`/tournaments/${tournamentId}/leaderboard`)
       .then(({ data }) => {
-        if (!cancel) setRows(data);
+        if (cancel) return;
+        if (Array.isArray(data)) {
+          setRows(data);
+          setSnapshotCapturedAt(null);
+        } else {
+          setRows(data.rows ?? []);
+          setSnapshotCapturedAt(data.snapshotCapturedAt ?? null);
+        }
       })
       .catch((err) => {
         if (!cancel) setError(getErrorMessage(err));
@@ -28,5 +38,11 @@ export function useLeaderboard(tournamentId?: string) {
     };
   }, [tournamentId, key]);
 
-  return { rows, loading, error, reload: () => setKey((k) => k + 1) };
+  return {
+    rows,
+    snapshotCapturedAt,
+    loading,
+    error,
+    reload: () => setKey((k) => k + 1),
+  };
 }

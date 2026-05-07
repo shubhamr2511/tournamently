@@ -3,6 +3,7 @@ import { Tournament } from '../models/Tournament';
 import { Player } from '../models/Player';
 import { Match } from '../models/Match';
 import { PlayoffMatch } from '../models/PlayoffMatch';
+import { LeaderboardSnapshot } from '../models/LeaderboardSnapshot';
 import { computeLeaderboard } from '../services/leaderboardCalculator';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AppError } from '../utils/AppError';
@@ -30,6 +31,7 @@ publicRouter.get(
       upcomingMatches,
       featuredMatches,
       playoffs,
+      lastSnapshot,
     ] = await Promise.all([
       Player.find({ tournament: tid, isActive: true }),
       Match.find({ tournament: tid }),
@@ -62,10 +64,27 @@ publicRouter.get(
       PlayoffMatch.find({ tournament: tid })
         .populate('playerA playerB')
         .sort({ round: 1, matchNumber: 1 }),
+      LeaderboardSnapshot.findOne({ tournament: tid }).sort({
+        capturedAt: -1,
+      }),
     ]);
 
     const completedAll = allMatches.filter((m) => m.status === 'completed');
-    const leaderboard = computeLeaderboard(t, players, completedAll);
+    const baseLeaderboard = computeLeaderboard(t, players, completedAll);
+    const prevByPlayer = new Map<string, number>();
+    if (lastSnapshot) {
+      for (const r of lastSnapshot.rows) {
+        prevByPlayer.set(String(r.player), r.rank);
+      }
+    }
+    const leaderboard = baseLeaderboard.map((r) => {
+      const prev = prevByPlayer.get(String(r.player._id));
+      return {
+        ...r,
+        previousRank: prev ?? null,
+        rankDelta: prev != null ? prev - r.rank : null,
+      };
+    });
 
     const tournamentObj = t.toObject() as unknown as Record<string, unknown>;
     delete tournamentObj.adminPassword;
@@ -73,6 +92,7 @@ publicRouter.get(
     res.json({
       tournament: tournamentObj,
       leaderboard,
+      snapshotCapturedAt: lastSnapshot?.capturedAt ?? null,
       todayMatches,
       recentResults,
       upcomingMatches,

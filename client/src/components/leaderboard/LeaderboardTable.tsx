@@ -9,6 +9,63 @@ interface Props {
   rows: ILeaderboardRow[];
   slug: string;
   highlightZones?: boolean;
+  showMovement?: boolean;
+}
+
+function MovementIndicator({
+  delta,
+  hasBaseline,
+}: {
+  delta: number | null | undefined;
+  hasBaseline: boolean;
+}) {
+  if (!hasBaseline) {
+    return (
+      <span className="font-mono text-[10px] text-text-muted" title="No baseline yet">
+        —
+      </span>
+    );
+  }
+  if (delta == null) {
+    return (
+      <span
+        className="font-mono text-[10px] text-accent-blue"
+        title="New since last record"
+      >
+        NEW
+      </span>
+    );
+  }
+  if (delta > 0) {
+    return (
+      <span
+        className="inline-flex items-center gap-0.5 font-mono text-[11px] text-accent-green"
+        title={`Up ${delta} from last record`}
+      >
+        <span aria-hidden="true">▲</span>
+        {delta}
+      </span>
+    );
+  }
+  if (delta < 0) {
+    return (
+      <span
+        className="inline-flex items-center gap-0.5 font-mono text-[11px] text-accent-red"
+        title={`Down ${-delta} from last record`}
+      >
+        <span aria-hidden="true">▼</span>
+        {-delta}
+      </span>
+    );
+  }
+  return (
+    <span
+      className="font-mono text-[10px] text-text-muted"
+      title="No change since last record"
+    >
+      —
+    </span>
+  );
 }
 
 const FLIP_DURATION_MS = 1500;
@@ -78,7 +135,12 @@ function snapshotsEqual(a: RowSnapshot, b: RowSnapshot): boolean {
   );
 }
 
-export function LeaderboardTable({ rows, slug, highlightZones = true }: Props) {
+export function LeaderboardTable({
+  rows,
+  slug,
+  highlightZones = true,
+  showMovement = true,
+}: Props) {
   const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
   const prevPositions = useRef(new Map<string, number>());
   const prevSnapshots = useRef(new Map<string, RowSnapshot>());
@@ -158,6 +220,7 @@ export function LeaderboardTable({ rows, slug, highlightZones = true }: Props) {
         <thead>
           <tr className="text-left font-display uppercase tracking-wider text-xs text-text-muted">
             <th className="py-2 pr-3">Rank</th>
+            {showMovement && <th className="py-2 pr-3 text-center">Mv</th>}
             <th className="py-2 pr-3">Player</th>
             <th className="py-2 pr-3 text-center">MP</th>
             <th className="py-2 pr-3 text-center text-accent-green">W</th>
@@ -183,6 +246,11 @@ export function LeaderboardTable({ rows, slug, highlightZones = true }: Props) {
               )}
             >
               <td className="py-2 pr-3">{rankBadge(r.rank)}</td>
+              {showMovement && (
+                <td className="py-2 pr-3 text-center whitespace-nowrap">
+                  <MovementIndicator delta={r.rankDelta} hasBaseline />
+                </td>
+              )}
               <td className="py-2 pr-3">
                 <Link
                   to={`/t/${slug}/player/${r.player._id}`}

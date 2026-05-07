@@ -162,11 +162,25 @@ export interface ILeaderboardRow {
   gamesLost: number;
   gameDiff: number;
   winPercentage: number;
+  previousRank?: number | null;
+  rankDelta?: number | null;
+}
+
+export interface ILeaderboardResponse {
+  rows: ILeaderboardRow[];
+  snapshotCapturedAt: string | null;
+}
+
+export interface ILeaderboardSnapshotSummary {
+  _id: string;
+  capturedAt: string;
+  createdAt: string;
 }
 
 export interface IPublicTournamentPayload {
   tournament: ITournament;
   leaderboard: ILeaderboardRow[];
+  snapshotCapturedAt: string | null;
   todayMatches: IMatch[];
   recentResults: IMatch[];
   upcomingMatches: IMatch[];
