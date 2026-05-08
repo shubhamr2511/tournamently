@@ -10,7 +10,7 @@ interface Props {
 
 export function BadgesPanel({ badges, slug }: Props) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+    <div className="grid grid-cols-1 gap-2">
       {badges.map((b) => {
         const meta = BADGE_META[b.key] ?? FALLBACK_BADGE_META;
         return (

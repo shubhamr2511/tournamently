@@ -167,7 +167,7 @@ export function PublicView() {
         {leaderboard.length === 0 ? (
           <EmptyState title="No matches yet" />
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)] gap-4 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,300px)] gap-4 items-start">
             <Card className="overflow-hidden">
               <LeaderboardTable rows={leaderboard} slug={slug} badges={badges} />
             </Card>
