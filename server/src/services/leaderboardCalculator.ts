@@ -125,7 +125,8 @@ export function computeLeaderboard(
   ];
 
   rows.sort((x, y) => {
-    if (y.wins !== x.wins) return y.wins - x.wins;
+    if (y.winPercentage !== x.winPercentage)
+      return y.winPercentage - x.winPercentage;
     for (const tb of tiebreakers) {
       switch (tb) {
         case 'bonus_points':
@@ -158,7 +159,7 @@ export function computeLeaderboard(
     if (idx > 0) {
       const prev = rows[idx - 1];
       const sameRank =
-        prev.wins === r.wins &&
+        prev.winPercentage === r.winPercentage &&
         prev.bonusPoints === r.bonusPoints &&
         prev.gameDiff === r.gameDiff &&
         prev.perfectRounds === r.perfectRounds &&
