@@ -41,8 +41,11 @@ export function PlayerProfile() {
   const playerMatches = useMemo(
     () =>
       matches.filter((m) => {
-        const a = typeof m.playerA === 'object' ? m.playerA._id : m.playerA;
-        const b = typeof m.playerB === 'object' ? m.playerB._id : m.playerB;
+        const aObj = typeof m.playerA === 'object' ? m.playerA : null;
+        const bObj = typeof m.playerB === 'object' ? m.playerB : null;
+        if (aObj?.isAbsent || bObj?.isAbsent) return false;
+        const a = aObj ? aObj._id : (m.playerA as string);
+        const b = bObj ? bObj._id : (m.playerB as string);
         return a === playerId || b === playerId;
       }),
     [matches, playerId],

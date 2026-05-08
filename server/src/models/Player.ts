@@ -12,6 +12,7 @@ export interface IPlayerDoc extends Document {
   characterLocked: boolean;
   seed?: number;
   isActive: boolean;
+  isAbsent: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,6 +34,7 @@ const PlayerSchema = new Schema<IPlayerDoc>(
     characterLocked: { type: Boolean, default: false },
     seed: { type: Number },
     isActive: { type: Boolean, default: true },
+    isAbsent: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

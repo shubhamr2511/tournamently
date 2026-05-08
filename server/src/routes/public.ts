@@ -24,6 +24,14 @@ publicRouter.get(
     const tomorrow = new Date(today);
     tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
+    const absentIds = (
+      await Player.find({ tournament: tid, isAbsent: true }, { _id: 1 })
+    ).map((p) => p._id);
+    const notAbsent =
+      absentIds.length > 0
+        ? { playerA: { $nin: absentIds }, playerB: { $nin: absentIds } }
+        : {};
+
     const [
       players,
       allMatches,
@@ -38,16 +46,18 @@ publicRouter.get(
       Match.find({ tournament: tid }),
       Match.find({
         tournament: tid,
+        ...notAbsent,
         scheduledDate: { $gte: today, $lt: tomorrow },
       })
         .populate('playerA playerB')
         .sort({ matchNumber: 1 }),
-      Match.find({ tournament: tid, status: 'completed' })
+      Match.find({ tournament: tid, ...notAbsent, status: 'completed' })
         .populate('playerA playerB')
         .sort({ 'result.completedAt': -1 })
         .limit(10),
       Match.find({
         tournament: tid,
+        ...notAbsent,
         status: 'scheduled',
         scheduledDate: { $gte: today },
       })
@@ -56,6 +66,7 @@ publicRouter.get(
         .limit(30),
       Match.find({
         tournament: tid,
+        ...notAbsent,
         status: 'completed',
         'result.isFeatured': true,
       })

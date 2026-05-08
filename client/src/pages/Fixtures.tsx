@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useTournament } from '../hooks/useTournament';
 import { useMatches } from '../hooks/useMatches';
+import { usePlayers } from '../hooks/usePlayers';
 import { formatDate } from '../utils/formatting';
 import type { IMatch, IPlayer } from '../types';
 
@@ -31,6 +32,7 @@ export function Fixtures() {
   const [search, setSearch] = useState('');
   const filters = statusFilter ? { status: statusFilter } : undefined;
   const { matches, loading, reload } = useMatches(tournament?._id, filters);
+  const { players, reload: reloadPlayers } = usePlayers(tournament?._id);
 
   const trimmedSearch = search.trim().toLowerCase();
   const visibleMatches = trimmedSearch
@@ -68,6 +70,24 @@ export function Fixtures() {
     try {
       await api.post(`/tournaments/${tournament._id}/fixtures/generate`);
       push('Fixtures generated', 'success');
+      reload();
+    } catch (err) {
+      push(getErrorMessage(err), 'error');
+    }
+  }
+
+  async function toggleAbsent(p: IPlayer) {
+    if (!tournament) return;
+    try {
+      await api.put(
+        `/tournaments/${tournament._id}/players/${p._id}/absent`,
+        { isAbsent: !p.isAbsent },
+      );
+      push(
+        p.isAbsent ? `${p.gamerTag} marked present` : `${p.gamerTag} marked absent`,
+        'success',
+      );
+      reloadPlayers();
       reload();
     } catch (err) {
       push(getErrorMessage(err), 'error');
@@ -134,6 +154,30 @@ export function Fixtures() {
           )}
         </div>
       </div>
+
+      {isAdmin && players.length > 0 && (
+        <div className="mb-5">
+          <div className="font-display tracking-widest uppercase text-text-muted text-[10px] mb-2">
+            Attendance · click to toggle absent
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {players.map((p) => (
+              <button
+                key={p._id}
+                type="button"
+                onClick={() => toggleAbsent(p)}
+                className={`font-mono text-[11px] px-2 py-1 border transition-colors ${
+                  p.isAbsent
+                    ? 'border-accent-red text-accent-red line-through opacity-80 hover:opacity-100'
+                    : 'border-border text-text-secondary hover:border-accent-yellow hover:text-accent-yellow'
+                }`}
+              >
+                {p.gamerTag}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <PageLoader />
@@ -205,11 +249,21 @@ function FixtureRow({
   isAdmin: boolean;
   onReschedule: (date: string) => void;
 }) {
+  const a = asPlayer(match.playerA);
+  const b = asPlayer(match.playerB);
+  const hasAbsent = !!(a?.isAbsent || b?.isAbsent);
   return (
-    <div className="space-y-2">
+    <div className={`space-y-2 ${hasAbsent ? 'opacity-50' : ''}`}>
       <MatchCard match={match} slug={slug} isAdmin={isAdmin} showPlayerName />
       {isAdmin && (
         <div className="flex items-center gap-2 text-xs text-text-muted px-2">
+          {hasAbsent && (
+            <Badge tone="red">
+              Absent: {[a?.isAbsent && a.gamerTag, b?.isAbsent && b.gamerTag]
+                .filter(Boolean)
+                .join(' · ')}
+            </Badge>
+          )}
           <span>reschedule:</span>
           <input
             type="date"
@@ -221,10 +275,9 @@ function FixtureRow({
             }
             onChange={(e) => onReschedule(e.target.value)}
           />
-          {asPlayer(match.playerA) && asPlayer(match.playerB) && (
+          {a && b && !hasAbsent && (
             <span className="text-text-muted/60 truncate">
-              {asPlayer(match.playerA)?.gamerTag} ·{' '}
-              {asPlayer(match.playerB)?.gamerTag}
+              {a.gamerTag} · {b.gamerTag}
             </span>
           )}
         </div>

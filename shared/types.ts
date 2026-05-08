@@ -70,6 +70,7 @@ export interface IPlayer {
   characterLocked: boolean;
   seed?: number;
   isActive: boolean;
+  isAbsent: boolean;
   createdAt: string;
   updatedAt: string;
 }

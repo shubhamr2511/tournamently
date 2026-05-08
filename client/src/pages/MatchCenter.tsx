@@ -26,14 +26,19 @@ export function MatchCenter() {
   if (player) filters.player = player;
 
   const { matches, loading } = useMatches(tournament?._id, filters);
+  const visible = matches.filter((m) => {
+    const a = typeof m.playerA === 'object' ? m.playerA : null;
+    const b = typeof m.playerB === 'object' ? m.playerB : null;
+    return !a?.isAbsent && !b?.isAbsent;
+  });
   const filtered = search
-    ? matches.filter((m) => {
+    ? visible.filter((m) => {
         const a = typeof m.playerA === 'object' ? m.playerA.name : '';
         const b = typeof m.playerB === 'object' ? m.playerB.name : '';
         const q = search.toLowerCase();
         return a.toLowerCase().includes(q) || b.toLowerCase().includes(q);
       })
-    : matches;
+    : visible;
 
   return (
     <div className="max-w-6xl mx-auto">

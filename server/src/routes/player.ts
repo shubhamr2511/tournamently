@@ -84,6 +84,25 @@ playerRouter.put(
   }),
 );
 
+playerRouter.put(
+  '/:pid/absent',
+  requireAuth,
+  requireTournamentAdmin,
+  asyncHandler(async (req, res) => {
+    const { isAbsent } = req.body || {};
+    if (typeof isAbsent !== 'boolean') {
+      throw new AppError('isAbsent (boolean) required', 400);
+    }
+    const player = await Player.findOneAndUpdate(
+      { _id: req.params.pid, tournament: req.params.tid },
+      { isAbsent },
+      { new: true },
+    );
+    if (!player) throw new AppError('Player not found', 404);
+    res.json(player);
+  }),
+);
+
 playerRouter.delete(
   '/:pid',
   requireAuth,
