@@ -1,15 +1,17 @@
 import clsx from 'clsx';
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { CharacterAvatar } from '../player/CharacterAvatar';
 import { firstNameWithInitials } from '../../utils/formatting';
-import type { ILeaderboardRow } from '../../types';
+import { BADGE_META, FALLBACK_BADGE_META } from './badgeMeta';
+import type { IBadgeAward, ILeaderboardRow } from '../../types';
 
 interface Props {
   rows: ILeaderboardRow[];
   slug: string;
   highlightZones?: boolean;
   showMovement?: boolean;
+  badges?: IBadgeAward[];
 }
 
 function MovementIndicator({
@@ -140,10 +142,24 @@ export function LeaderboardTable({
   slug,
   highlightZones = true,
   showMovement = true,
+  badges,
 }: Props) {
   const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
   const prevPositions = useRef(new Map<string, number>());
   const prevSnapshots = useRef(new Map<string, RowSnapshot>());
+
+  const badgesByPlayer = useMemo(() => {
+    const map = new Map<string, IBadgeAward[]>();
+    if (!badges) return map;
+    for (const b of badges) {
+      if (!b.winner) continue;
+      const id = b.winner.player._id;
+      const list = map.get(id) ?? [];
+      list.push(b);
+      map.set(id, list);
+    }
+    return map;
+  }, [badges]);
 
   useLayoutEffect(() => {
     const newPositions = new Map<string, number>();
@@ -262,8 +278,21 @@ export function LeaderboardTable({
                     size="sm"
                   />
                   <div className="min-w-0">
-                    <div className="font-display tracking-wider truncate">
-                      {r.player.gamerTag}
+                    <div className="font-display tracking-wider truncate flex items-center gap-1">
+                      <span className="truncate">{r.player.gamerTag}</span>
+                      {(badgesByPlayer.get(r.player._id) ?? []).map((b) => {
+                        const meta = BADGE_META[b.key] ?? FALLBACK_BADGE_META;
+                        return (
+                          <span
+                            key={b.key}
+                            title={`${b.name} — ${b.winner?.detail ?? b.description}`}
+                            className="text-[12px] leading-none"
+                            aria-label={b.name}
+                          >
+                            {meta.icon}
+                          </span>
+                        );
+                      })}
                     </div>
                     <div className="text-[10px] text-text-muted truncate">
                       {firstNameWithInitials(r.player.name)}

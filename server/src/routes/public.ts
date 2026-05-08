@@ -5,6 +5,7 @@ import { Match } from '../models/Match';
 import { PlayoffMatch } from '../models/PlayoffMatch';
 import { LeaderboardSnapshot } from '../models/LeaderboardSnapshot';
 import { computeLeaderboard } from '../services/leaderboardCalculator';
+import { computeBadges } from '../services/badgeCalculator';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AppError } from '../utils/AppError';
 import { parseBody, playerInputSchema } from '../utils/validation';
@@ -85,6 +86,7 @@ publicRouter.get(
         rankDelta: prev != null ? prev - r.rank : null,
       };
     });
+    const badges = computeBadges(baseLeaderboard, players, completedAll);
 
     const tournamentObj = t.toObject() as unknown as Record<string, unknown>;
     delete tournamentObj.adminPassword;
@@ -98,6 +100,7 @@ publicRouter.get(
       upcomingMatches,
       featuredMatches,
       playoffs: playoffs.length > 0 ? playoffs : null,
+      badges,
       stats: {
         totalMatches: allMatches.length,
         completedMatches: completedAll.length,

@@ -202,6 +202,26 @@ export interface IStandingsHistoryResponse {
   snapshots: IStandingsHistorySnapshot[];
 }
 
+export interface IBadgePlayer {
+  _id: string;
+  gamerTag: string;
+  name: string;
+  character?: string;
+}
+
+export interface IBadgeWinner {
+  player: IBadgePlayer;
+  value: number;
+  detail?: string;
+}
+
+export interface IBadgeAward {
+  key: string;
+  name: string;
+  description: string;
+  winner: IBadgeWinner | null;
+}
+
 export interface IPublicTournamentPayload {
   tournament: ITournament;
   leaderboard: ILeaderboardRow[];
@@ -211,6 +231,7 @@ export interface IPublicTournamentPayload {
   upcomingMatches: IMatch[];
   featuredMatches: IMatch[];
   playoffs: IPlayoffMatch[] | null;
+  badges: IBadgeAward[];
   stats: {
     totalMatches: number;
     completedMatches: number;

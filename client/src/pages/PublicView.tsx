@@ -6,6 +6,7 @@ import { Badge } from '../components/ui/Badge';
 import { PageLoader } from '../components/ui/Spinner';
 import { EmptyState } from '../components/ui/EmptyState';
 import { LeaderboardTable } from '../components/leaderboard/LeaderboardTable';
+import { BadgesPanel } from '../components/leaderboard/BadgesPanel';
 import { StandingsHistoryChart } from '../components/leaderboard/StandingsHistoryChart';
 import { MatchCard } from '../components/match/MatchCard';
 import type {
@@ -81,7 +82,7 @@ export function PublicView() {
       </div>
     );
 
-  const { tournament, leaderboard, recentResults, upcomingMatches, featuredMatches, playoffs, stats } = data;
+  const { tournament, leaderboard, recentResults, upcomingMatches, featuredMatches, playoffs, badges, stats } = data;
 
   const trimmedSearch = search.trim().toLowerCase();
   const matchHasGamerTag = (m: typeof upcomingMatches[number]) => {
@@ -99,7 +100,7 @@ export function PublicView() {
   const filteredFeatured = filterMatches(featuredMatches);
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-8">
+    <div className="w-full p-6 space-y-8">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="font-display tracking-widest uppercase text-text-muted text-xs">
@@ -166,9 +167,19 @@ export function PublicView() {
         {leaderboard.length === 0 ? (
           <EmptyState title="No matches yet" />
         ) : (
-          <Card className="overflow-hidden">
-            <LeaderboardTable rows={leaderboard} slug={slug} />
-          </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)] gap-4 items-start">
+            <Card className="overflow-hidden">
+              <LeaderboardTable rows={leaderboard} slug={slug} badges={badges} />
+            </Card>
+            {badges && badges.length > 0 && (
+              <div>
+                <h3 className="font-display tracking-widest uppercase text-text-muted text-xs mb-2">
+                  Badges
+                </h3>
+                <BadgesPanel badges={badges} slug={slug} />
+              </div>
+            )}
+          </div>
         )}
       </section>
 
