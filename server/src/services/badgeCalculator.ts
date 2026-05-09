@@ -19,7 +19,7 @@ export interface BadgeAward {
   key: string;
   name: string;
   description: string;
-  winners: BadgeWinner[];
+  winner: BadgeWinner | null;
 }
 
 function summary(p: IPlayerDoc): BadgePlayerSummary {
@@ -31,42 +31,13 @@ function summary(p: IPlayerDoc): BadgePlayerSummary {
   };
 }
 
-function topWinner(
-  map: Map<string, number>,
-  playerById: Map<string, IPlayerDoc>,
-  detailFn: (v: number) => string,
-): BadgeWinner[] {
-  let bestVal = 0;
-  map.forEach((v) => {
-    if (v > bestVal) bestVal = v;
-  });
-  if (bestVal <= 0) return [];
-  const winners: BadgeWinner[] = [];
+function topByMap(map: Map<string, number>): { id: string; value: number } | null {
+  let best: { id: string; value: number } | null = null;
   map.forEach((v, id) => {
-    if (v !== bestVal) return;
-    const p = playerById.get(id);
-    if (p) winners.push({ player: summary(p), value: v, detail: detailFn(v) });
+    if (v <= 0) return;
+    if (!best || v > best.value) best = { id, value: v };
   });
-  winners.sort((a, b) => a.player.gamerTag.localeCompare(b.player.gamerTag));
-  return winners;
-}
-
-function allQualifyingWinners(
-  map: Map<string, number>,
-  playerById: Map<string, IPlayerDoc>,
-  threshold: number,
-  detailFn: (v: number) => string,
-): BadgeWinner[] {
-  const winners: BadgeWinner[] = [];
-  map.forEach((v, id) => {
-    if (v < threshold) return;
-    const p = playerById.get(id);
-    if (p) winners.push({ player: summary(p), value: v, detail: detailFn(v) });
-  });
-  winners.sort(
-    (a, b) => b.value - a.value || a.player.gamerTag.localeCompare(b.player.gamerTag),
-  );
-  return winners;
+  return best;
 }
 
 export function computeBadges(
@@ -97,8 +68,7 @@ export function computeBadges(
   const streakBest = new Map<string, number>();
   const streakNow = new Map<string, number>();
 
-  let whoopsieGap = 0;
-  const whoopsieWinnerIds = new Map<string, number>();
+  let whoopsie: { winnerId: string; gap: number } | null = null;
 
   const rank1Id = leaderboard[0] ? String(leaderboard[0].player._id) : null;
 
@@ -138,17 +108,18 @@ export function computeBadges(
       if (gap >= 4) {
         giantSlayer.set(winnerId, (giantSlayer.get(winnerId) || 0) + 1);
       }
-      if (gap > 0) {
-        if (gap > whoopsieGap) {
-          whoopsieGap = gap;
-          whoopsieWinnerIds.clear();
-          whoopsieWinnerIds.set(winnerId, gap);
-        } else if (gap === whoopsieGap) {
-          whoopsieWinnerIds.set(winnerId, gap);
-        }
+      if (gap > 0 && (!whoopsie || gap > whoopsie.gap)) {
+        whoopsie = { winnerId, gap };
       }
     }
   }
+
+  const makeWinner = (id: string | null, value: number, detail?: string): BadgeWinner | null => {
+    if (!id) return null;
+    const p = playerById.get(id);
+    if (!p) return null;
+    return { player: summary(p), value, detail };
+  };
 
   const awards: BadgeAward[] = [];
 
@@ -157,148 +128,136 @@ export function computeBadges(
     key: 'iron_fist',
     name: 'Iron Fist Crown',
     description: 'League leader',
-    winners: leader && leader.matchesPlayed > 0
-      ? [{ player: summary(leader.player), value: 1, detail: `${leader.winPercentage}% wins` }]
-      : [],
+    winner: leader && leader.matchesPlayed > 0
+      ? { player: summary(leader.player), value: 1, detail: `${leader.winPercentage}% wins` }
+      : null,
   });
 
+  const rage = [...leaderboard].sort((x, y) => y.bonusPoints - x.bonusPoints)[0];
   awards.push({
     key: 'rage_driver',
     name: 'Rage Driver',
     description: 'Most bonus points',
-    winners: topWinner(
-      new Map(leaderboard.filter((r) => r.bonusPoints > 0).map((r) => [String(r.player._id), r.bonusPoints])),
-      playerById,
-      (v) => `+${v} bonus`,
-    ),
+    winner: rage && rage.bonusPoints > 0
+      ? { player: summary(rage.player), value: rage.bonusPoints, detail: `+${rage.bonusPoints} bonus` }
+      : null,
   });
 
+  const perf = [...leaderboard].sort((x, y) => y.perfectRounds - x.perfectRounds)[0];
   awards.push({
     key: 'prefectionist',
     name: 'Prefectionist',
     description: 'Most perfects',
-    winners: topWinner(
-      new Map(leaderboard.filter((r) => r.perfectRounds > 0).map((r) => [String(r.player._id), r.perfectRounds])),
-      playerById,
-      (v) => `${v} perfect${v === 1 ? '' : 's'}`,
-    ),
+    winner: perf && perf.perfectRounds > 0
+      ? { player: summary(perf.player), value: perf.perfectRounds, detail: `${perf.perfectRounds} perfects` }
+      : null,
   });
 
+  const fast = [...leaderboard].sort((x, y) => y.fastWins - x.fastWins)[0];
   awards.push({
     key: 'speed_runner',
     name: 'Speed Runner',
     description: 'Most fast wins',
-    winners: topWinner(
-      new Map(leaderboard.filter((r) => r.fastWins > 0).map((r) => [String(r.player._id), r.fastWins])),
-      playerById,
-      (v) => `${v} fast win${v === 1 ? '' : 's'}`,
-    ),
+    winner: fast && fast.fastWins > 0
+      ? { player: summary(fast.player), value: fast.fastWins, detail: `${fast.fastWins} fast wins` }
+      : null,
   });
 
+  const ks = topByMap(kingSlayer);
   awards.push({
     key: 'king_slayer',
     name: 'King Slayer',
     description: 'Beat the league leader',
-    winners: allQualifyingWinners(
-      kingSlayer,
-      playerById,
-      1,
-      (v) => `${v} win${v === 1 ? '' : 's'} vs #1`,
-    ),
+    winner: ks ? makeWinner(ks.id, ks.value, `${ks.value} win${ks.value === 1 ? '' : 's'} vs #1`) : null,
   });
 
+  const ironCandidates = leaderboard
+    .filter((r) => r.matchesPlayed > 0 && r.gamesLost === 0)
+    .sort((x, y) => y.matchesPlayed - x.matchesPlayed);
+  const iron = ironCandidates[0];
   awards.push({
     key: 'iron_wall',
     name: 'Iron Wall',
     description: 'Never lost a round',
-    winners: leaderboard
-      .filter((r) => r.matchesPlayed > 0 && r.gamesLost === 0)
-      .sort((x, y) => y.matchesPlayed - x.matchesPlayed || x.player.gamerTag.localeCompare(y.player.gamerTag))
-      .map((r) => ({
-        player: summary(r.player),
-        value: r.matchesPlayed,
-        detail: `${r.gamesWon}–0 across ${r.matchesPlayed} match${r.matchesPlayed === 1 ? '' : 'es'}`,
-      })),
+    winner: iron
+      ? { player: summary(iron.player), value: iron.matchesPlayed, detail: `${iron.gamesWon}–0 across ${iron.matchesPlayed} matches` }
+      : null,
   });
 
+  let streakId: string | null = null;
+  let streakVal = 0;
+  streakBest.forEach((v, id) => {
+    if (v > streakVal) { streakVal = v; streakId = id; }
+  });
   awards.push({
     key: 'streakmaster',
     name: 'Streakmaster',
     description: '5+ wins in a row',
-    winners: allQualifyingWinners(
-      streakBest,
-      playerById,
-      5,
-      (v) => `${v}-match streak`,
-    ),
+    winner: streakId && streakVal >= 5
+      ? makeWinner(streakId, streakVal, `${streakVal}-match streak`)
+      : null,
   });
 
+  const gs = topByMap(giantSlayer);
   awards.push({
     key: 'giant_slayer',
     name: 'Giant Slayer',
     description: 'Beat someone 4+ spots above',
-    winners: allQualifyingWinners(
-      giantSlayer,
-      playerById,
-      1,
-      (v) => `${v} upset${v === 1 ? '' : 's'}`,
-    ),
+    winner: gs ? makeWinner(gs.id, gs.value, `${gs.value} upset${gs.value === 1 ? '' : 's'}`) : null,
   });
 
+  const dq = topByMap(drama);
   awards.push({
     key: 'drama_queen',
     name: 'Drama Queen',
     description: 'Most matches that went to game 3',
-    winners: topWinner(drama, playerById, (v) => `${v} 2–1 matches`),
+    winner: dq ? makeWinner(dq.id, dq.value, `${dq.value} 2–1 matches`) : null,
   });
 
+  const ph = topByMap(philosopher);
   awards.push({
     key: 'philosopher',
     name: 'Philosopher',
     description: 'Most 2–1 wins',
-    winners: topWinner(philosopher, playerById, (v) => `${v} clutch wins`),
+    winner: ph ? makeWinner(ph.id, ph.value, `${ph.value} clutch wins`) : null,
   });
 
+  const bl = topByMap(bully);
   awards.push({
     key: 'the_bully',
     name: 'The Bully',
     description: 'Most 2–0 sweeps',
-    winners: topWinner(bully, playerById, (v) => `${v} sweeps`),
+    winner: bl ? makeWinner(bl.id, bl.value, `${bl.value} sweeps`) : null,
   });
 
-  const whoopsieWinners: BadgeWinner[] = [];
-  whoopsieWinnerIds.forEach((gap, id) => {
-    const p = playerById.get(id);
-    if (p) whoopsieWinners.push({ player: summary(p), value: gap, detail: `+${gap} spots` });
-  });
-  whoopsieWinners.sort((a, b) => a.player.gamerTag.localeCompare(b.player.gamerTag));
   awards.push({
     key: 'whoopsie',
     name: 'Whoopsie',
     description: 'Biggest spot-gap upset',
-    winners: whoopsieWinners,
+    winner: whoopsie
+      ? makeWinner(whoopsie.winnerId, whoopsie.gap, `+${whoopsie.gap} spots`)
+      : null,
   });
 
+  const enduranceRow = [...leaderboard].sort(
+    (x, y) => y.gamesWon + y.gamesLost - (x.gamesWon + x.gamesLost),
+  )[0];
+  const endVal = enduranceRow ? enduranceRow.gamesWon + enduranceRow.gamesLost : 0;
   awards.push({
     key: 'endurance_pro',
     name: 'Endurance Pro',
     description: 'Most rounds played',
-    winners: topWinner(
-      new Map(
-        leaderboard
-          .filter((r) => r.gamesWon + r.gamesLost > 0)
-          .map((r) => [String(r.player._id), r.gamesWon + r.gamesLost]),
-      ),
-      playerById,
-      (v) => `${v} rounds`,
-    ),
+    winner: enduranceRow && endVal > 0
+      ? { player: summary(enduranceRow.player), value: endVal, detail: `${endVal} rounds` }
+      : null,
   });
 
+  const dn = topByMap(donator);
   awards.push({
     key: 'the_donator',
     name: 'The Donator',
     description: 'Fed the most bonus to opponents',
-    winners: topWinner(donator, playerById, (v) => `${v} pts donated`),
+    winner: dn ? makeWinner(dn.id, dn.value, `${dn.value} pts donated`) : null,
   });
 
   return awards;

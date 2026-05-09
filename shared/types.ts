@@ -220,7 +220,7 @@ export interface IBadgeAward {
   key: string;
   name: string;
   description: string;
-  winners: IBadgeWinner[];
+  winner: IBadgeWinner | null;
 }
 
 export interface IPublicTournamentPayload {
