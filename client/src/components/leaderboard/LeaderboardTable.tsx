@@ -149,14 +149,14 @@ export function LeaderboardTable({
   const prevSnapshots = useRef(new Map<string, RowSnapshot>());
 
   const badgesByPlayer = useMemo(() => {
-    const map = new Map<string, IBadgeAward[]>();
+    const map = new Map<string, { award: IBadgeAward; winnerDetail?: string }[]>();
     if (!badges) return map;
     for (const b of badges) {
-      if (!b.winner) continue;
-      const id = b.winner.player._id;
-      const list = map.get(id) ?? [];
-      list.push(b);
-      map.set(id, list);
+      for (const w of b.winners) {
+        const list = map.get(w.player._id) ?? [];
+        list.push({ award: b, winnerDetail: w.detail });
+        map.set(w.player._id, list);
+      }
     }
     return map;
   }, [badges]);
@@ -280,14 +280,14 @@ export function LeaderboardTable({
                   <div className="min-w-0">
                     <div className="font-display tracking-wider truncate flex items-center gap-1">
                       <span className="truncate">{r.player.gamerTag}</span>
-                      {(badgesByPlayer.get(r.player._id) ?? []).map((b) => {
-                        const meta = BADGE_META[b.key] ?? FALLBACK_BADGE_META;
+                      {(badgesByPlayer.get(r.player._id) ?? []).map(({ award, winnerDetail }) => {
+                        const meta = BADGE_META[award.key] ?? FALLBACK_BADGE_META;
                         return (
                           <span
-                            key={b.key}
-                            title={`${b.name} — ${b.winner?.detail ?? b.description}`}
+                            key={award.key}
+                            title={`${award.name} — ${winnerDetail ?? award.description}`}
                             className="text-[12px] leading-none"
-                            aria-label={b.name}
+                            aria-label={award.name}
                           >
                             {meta.icon}
                           </span>
