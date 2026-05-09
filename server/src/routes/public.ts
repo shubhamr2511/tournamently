@@ -5,6 +5,7 @@ import { Match } from '../models/Match';
 import { PlayoffMatch } from '../models/PlayoffMatch';
 import { LeaderboardSnapshot } from '../models/LeaderboardSnapshot';
 import { computeLeaderboard } from '../services/leaderboardCalculator';
+import { pickLeaderboardBaseline } from '../services/leaderboardBaseline';
 import { computeBadges } from '../services/badgeCalculator';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AppError } from '../utils/AppError';
@@ -40,7 +41,7 @@ publicRouter.get(
       upcomingMatches,
       featuredMatches,
       playoffs,
-      lastSnapshot,
+      recentSnapshots,
     ] = await Promise.all([
       Player.find({ tournament: tid, isActive: true }),
       Match.find({ tournament: tid }),
@@ -76,19 +77,15 @@ publicRouter.get(
       PlayoffMatch.find({ tournament: tid })
         .populate('playerA playerB')
         .sort({ round: 1, matchNumber: 1 }),
-      LeaderboardSnapshot.findOne({ tournament: tid }).sort({
-        capturedAt: -1,
-      }),
+      LeaderboardSnapshot.find({ tournament: tid })
+        .sort({ capturedAt: -1 })
+        .limit(2),
     ]);
 
     const completedAll = allMatches.filter((m) => m.status === 'completed');
     const baseLeaderboard = computeLeaderboard(t, players, completedAll);
-    const prevByPlayer = new Map<string, number>();
-    if (lastSnapshot) {
-      for (const r of lastSnapshot.rows) {
-        prevByPlayer.set(String(r.player), r.rank);
-      }
-    }
+    const { capturedAt: snapshotCapturedAt, prevByPlayer } =
+      pickLeaderboardBaseline(recentSnapshots, t.weekdaysOnly);
     const leaderboard = baseLeaderboard.map((r) => {
       const prev = prevByPlayer.get(String(r.player._id));
       return {
@@ -105,7 +102,7 @@ publicRouter.get(
     res.json({
       tournament: tournamentObj,
       leaderboard,
-      snapshotCapturedAt: lastSnapshot?.capturedAt ?? null,
+      snapshotCapturedAt,
       todayMatches,
       recentResults,
       upcomingMatches,

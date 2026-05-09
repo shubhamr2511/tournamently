@@ -6,6 +6,7 @@ import { LeaderboardSnapshot } from '../models/LeaderboardSnapshot';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AppError } from '../utils/AppError';
 import { computeLeaderboard } from '../services/leaderboardCalculator';
+import { pickLeaderboardBaseline } from '../services/leaderboardBaseline';
 import { requireAuth, requireTournamentAdmin } from '../middleware/auth';
 
 export const leaderboardRouter = Router({ mergeParams: true });
@@ -16,20 +17,18 @@ leaderboardRouter.get(
     const tid = req.params.tid;
     const t = await Tournament.findById(tid);
     if (!t) throw new AppError('Tournament not found', 404);
-    const [players, matches, lastSnapshot] = await Promise.all([
+    const [players, matches, recentSnapshots] = await Promise.all([
       Player.find({ tournament: tid, isActive: true }),
       Match.find({ tournament: tid, status: 'completed' }),
-      LeaderboardSnapshot.findOne({ tournament: tid }).sort({
-        capturedAt: -1,
-      }),
+      LeaderboardSnapshot.find({ tournament: tid })
+        .sort({ capturedAt: -1 })
+        .limit(2),
     ]);
     const rows = computeLeaderboard(t, players, matches);
-    const prevByPlayer = new Map<string, number>();
-    if (lastSnapshot) {
-      for (const r of lastSnapshot.rows) {
-        prevByPlayer.set(String(r.player), r.rank);
-      }
-    }
+    const { capturedAt, prevByPlayer } = pickLeaderboardBaseline(
+      recentSnapshots,
+      t.weekdaysOnly,
+    );
     const decorated = rows.map((r) => {
       const prev = prevByPlayer.get(String(r.player._id));
       return {
@@ -40,7 +39,7 @@ leaderboardRouter.get(
     });
     res.json({
       rows: decorated,
-      snapshotCapturedAt: lastSnapshot?.capturedAt ?? null,
+      snapshotCapturedAt: capturedAt,
     });
   }),
 );

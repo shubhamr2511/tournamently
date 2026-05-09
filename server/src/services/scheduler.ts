@@ -37,6 +37,17 @@ export function buildAvailableDates(
   return out;
 }
 
+export function nextGameDayUTC(d: Date, weekdaysOnly: boolean): Date {
+  const next = new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()),
+  );
+  next.setUTCDate(next.getUTCDate() + 1);
+  while (weekdaysOnly && (next.getUTCDay() === 0 || next.getUTCDay() === 6)) {
+    next.setUTCDate(next.getUTCDate() + 1);
+  }
+  return next;
+}
+
 export function distributeFixturesAcrossDates(
   fixtureCount: number,
   input: ScheduleInput,
