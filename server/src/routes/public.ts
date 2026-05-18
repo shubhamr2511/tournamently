@@ -94,7 +94,7 @@ publicRouter.get(
         rankDelta: prev != null ? prev - r.rank : null,
       };
     });
-    const badges = computeBadges(baseLeaderboard, players, completedAll);
+    const badges = computeBadges(baseLeaderboard, players, completedAll, recentSnapshots[0] ?? null);
 
     const tournamentObj = t.toObject() as unknown as Record<string, unknown>;
     delete tournamentObj.adminPassword;

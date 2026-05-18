@@ -1,5 +1,6 @@
 import { IPlayerDoc } from '../models/Player';
 import { IMatchDoc } from '../models/Match';
+import { ILeaderboardSnapshotDoc } from '../models/LeaderboardSnapshot';
 import { LeaderboardRow } from './leaderboardCalculator';
 
 export interface BadgePlayerSummary {
@@ -44,6 +45,7 @@ export function computeBadges(
   leaderboard: LeaderboardRow[],
   players: IPlayerDoc[],
   matches: IMatchDoc[],
+  lastSnapshot?: ILeaderboardSnapshotDoc | null,
 ): BadgeAward[] {
   const playerById = new Map<string, IPlayerDoc>();
   for (const p of players) playerById.set(String(p._id), p);
@@ -70,7 +72,18 @@ export function computeBadges(
 
   let whoopsie: { winnerId: string; gap: number } | null = null;
 
-  const rank1Id = leaderboard[0] ? String(leaderboard[0].player._id) : null;
+  // Determine the "king" and the cutoff for king slayer from the last snapshot.
+  // Only matches played after the snapshot count; the king is whoever held #1
+  // in that snapshot. Falls back to current live #1 with no cutoff if no snapshot.
+  let kingId: string | null = null;
+  let kingSlayerCutoff: number = 0;
+  if (lastSnapshot) {
+    const snapRank1 = lastSnapshot.rows.find((r) => r.rank === 1);
+    kingId = snapRank1 ? String(snapRank1.player) : null;
+    kingSlayerCutoff = lastSnapshot.capturedAt.getTime();
+  } else {
+    kingId = leaderboard[0] ? String(leaderboard[0].player._id) : null;
+  }
 
   for (const m of completed) {
     const aId = String(m.playerA);
@@ -92,7 +105,8 @@ export function computeBadges(
     donator.set(aId, (donator.get(aId) || 0) + bGross);
     donator.set(bId, (donator.get(bId) || 0) + aGross);
 
-    if (rank1Id && winnerId !== rank1Id && loserId === rank1Id) {
+    const matchTime = m.result!.completedAt ? new Date(m.result!.completedAt).getTime() : 0;
+    if (kingId && winnerId !== kingId && loserId === kingId && matchTime > kingSlayerCutoff) {
       kingSlayer.set(winnerId, (kingSlayer.get(winnerId) || 0) + 1);
     }
 
