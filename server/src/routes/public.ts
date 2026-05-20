@@ -79,7 +79,7 @@ publicRouter.get(
         .sort({ round: 1, matchNumber: 1 }),
       LeaderboardSnapshot.find({ tournament: tid })
         .sort({ capturedAt: -1 })
-        .limit(2),
+        .limit(100),
     ]);
 
     const completedAll = allMatches.filter((m) => m.status === 'completed');
@@ -94,7 +94,7 @@ publicRouter.get(
         rankDelta: prev != null ? prev - r.rank : null,
       };
     });
-    const badges = computeBadges(baseLeaderboard, players, completedAll, recentSnapshots[1] ?? null);
+    const badges = computeBadges(baseLeaderboard, players, completedAll, recentSnapshots);
 
     const tournamentObj = t.toObject() as unknown as Record<string, unknown>;
     delete tournamentObj.adminPassword;

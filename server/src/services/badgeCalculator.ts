@@ -45,7 +45,7 @@ export function computeBadges(
   leaderboard: LeaderboardRow[],
   players: IPlayerDoc[],
   matches: IMatchDoc[],
-  lastSnapshot?: ILeaderboardSnapshotDoc | null,
+  snapshots?: ILeaderboardSnapshotDoc[],
 ): BadgeAward[] {
   const playerById = new Map<string, IPlayerDoc>();
   for (const p of players) playerById.set(String(p._id), p);
@@ -65,25 +65,36 @@ export function computeBadges(
   const philosopher = new Map<string, number>();
   const drama = new Map<string, number>();
   const donator = new Map<string, number>();
-  const kingSlayer = new Map<string, number>();
   const giantSlayer = new Map<string, number>();
   const streakBest = new Map<string, number>();
   const streakNow = new Map<string, number>();
 
   let whoopsie: { winnerId: string; gap: number } | null = null;
+  let latestKingSlayer: { winnerId: string; timestamp: number } | null = null;
 
-  // Determine the "king" and the cutoff for king slayer from the last snapshot.
-  // Only matches played after the snapshot count; the king is whoever held #1
-  // in that snapshot. Falls back to current live #1 with no cutoff if no snapshot.
-  let kingId: string | null = null;
-  let kingSlayerCutoff: number = 0;
-  if (lastSnapshot) {
-    const snapRank1 = lastSnapshot.rows.find((r) => r.rank === 1);
-    kingId = snapRank1 ? String(snapRank1.player) : null;
-    kingSlayerCutoff = lastSnapshot.capturedAt.getTime();
-  } else {
-    kingId = leaderboard[0] ? String(leaderboard[0].player._id) : null;
+  // Build a timeline of who was #1 at each snapshot time
+  const rank1Timeline: Array<{ time: number; playerId: string | null }> = [];
+  if (snapshots && snapshots.length > 0) {
+    const sortedSnapshots = [...snapshots].reverse();
+    for (const snap of sortedSnapshots) {
+      const rank1 = snap.rows.find((r) => r.rank === 1);
+      rank1Timeline.push({
+        time: snap.capturedAt.getTime(),
+        playerId: rank1 ? String(rank1.player) : null,
+      });
+    }
   }
+  const currentRank1 = leaderboard[0] ? String(leaderboard[0].player._id) : null;
+  rank1Timeline.push({ time: Date.now(), playerId: currentRank1 });
+
+  const getKingAtTime = (matchTime: number): string | null => {
+    for (let i = rank1Timeline.length - 1; i >= 0; i--) {
+      if (rank1Timeline[i].time <= matchTime) {
+        return rank1Timeline[i].playerId;
+      }
+    }
+    return null;
+  };
 
   for (const m of completed) {
     const aId = String(m.playerA);
@@ -106,8 +117,11 @@ export function computeBadges(
     donator.set(bId, (donator.get(bId) || 0) + aGross);
 
     const matchTime = m.result!.completedAt ? new Date(m.result!.completedAt).getTime() : 0;
-    if (kingId && winnerId !== kingId && loserId === kingId && matchTime > kingSlayerCutoff) {
-      kingSlayer.set(winnerId, (kingSlayer.get(winnerId) || 0) + 1);
+    const kingAtTime = getKingAtTime(matchTime);
+    if (kingAtTime && winnerId !== kingAtTime && loserId === kingAtTime) {
+      if (!latestKingSlayer || matchTime > latestKingSlayer.timestamp) {
+        latestKingSlayer = { winnerId, timestamp: matchTime };
+      }
     }
 
     const winnerStreak = (streakNow.get(winnerId) || 0) + 1;
@@ -177,12 +191,11 @@ export function computeBadges(
       : null,
   });
 
-  const ks = topByMap(kingSlayer);
   awards.push({
     key: 'king_slayer',
     name: 'King Slayer',
     description: 'Beat the league leader',
-    winner: ks ? makeWinner(ks.id, ks.value, `${ks.value} win${ks.value === 1 ? '' : 's'} vs #1`) : null,
+    winner: latestKingSlayer ? makeWinner(latestKingSlayer.winnerId, 1, 'Latest to beat #1') : null,
   });
 
   const ironCandidates = leaderboard
