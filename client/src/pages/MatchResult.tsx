@@ -99,7 +99,7 @@ export function MatchResult() {
   function setGameWinner(idx: number, winner: 'A' | 'B') {
     setGames((g) => {
       const next = [...g];
-      next[idx] = { winner };
+      next[idx] = { winner: next[idx].winner === winner ? '' : winner };
       return next;
     });
   }
