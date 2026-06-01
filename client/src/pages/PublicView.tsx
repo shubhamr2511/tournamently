@@ -79,6 +79,25 @@ export function PublicView() {
     };
   }, [load, loadHistory]);
 
+  useEffect(() => {
+    if (data) {
+      const finalMatch = data.playoffs?.find((m) => m.round === 3);
+      const champion = finalMatch?.status === 'completed' && finalMatch?.streakResult?.winner
+        ? typeof finalMatch.playerA === 'object' && finalMatch.playerA?._id === finalMatch.streakResult.winner
+          ? finalMatch.playerA
+          : typeof finalMatch.playerB === 'object' && finalMatch.playerB?._id === finalMatch.streakResult.winner
+            ? finalMatch.playerB
+            : null
+        : null;
+
+      if (champion && championRef.current) {
+        setTimeout(() => {
+          championRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 300);
+      }
+    }
+  }, [data]);
+
   if (loading) return <PageLoader label="Connecting…" />;
   if (error || !data)
     return (
@@ -97,14 +116,6 @@ export function PublicView() {
         ? finalMatch.playerB
         : null
     : null;
-
-  useEffect(() => {
-    if (champion && championRef.current) {
-      setTimeout(() => {
-        championRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 300);
-    }
-  }, [champion]);
 
   const trimmedSearch = search.trim().toLowerCase();
   const matchHasGamerTag = (m: typeof upcomingMatches[number]) => {
