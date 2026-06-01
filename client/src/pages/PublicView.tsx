@@ -9,10 +9,14 @@ import { LeaderboardTable } from '../components/leaderboard/LeaderboardTable';
 import { BadgesPanel } from '../components/leaderboard/BadgesPanel';
 import { StandingsHistoryChart } from '../components/leaderboard/StandingsHistoryChart';
 import { MatchCard } from '../components/match/MatchCard';
+import { BracketView } from '../components/playoffs/BracketView';
+import { CharacterAvatar } from '../components/player/CharacterAvatar';
+import { Confetti } from '../components/ui/Confetti';
 import type {
   IPublicTournamentPayload,
   IStandingsHistoryResponse,
   IStandingsHistorySnapshot,
+  IPlayer,
 } from '../types';
 
 const POLL_MS = 5000;
@@ -28,6 +32,7 @@ export function PublicView() {
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const cancelRef = useRef(false);
+  const championRef = useRef<HTMLDivElement>(null);
 
   const loadHistory = useCallback(() => {
     api
@@ -83,6 +88,23 @@ export function PublicView() {
     );
 
   const { tournament, leaderboard, recentResults, upcomingMatches, featuredMatches, playoffs, badges, stats } = data;
+
+  const finalMatch = playoffs?.find((m) => m.round === 3);
+  const champion = finalMatch?.status === 'completed' && finalMatch?.streakResult?.winner
+    ? typeof finalMatch.playerA === 'object' && finalMatch.playerA?._id === finalMatch.streakResult.winner
+      ? finalMatch.playerA
+      : typeof finalMatch.playerB === 'object' && finalMatch.playerB?._id === finalMatch.streakResult.winner
+        ? finalMatch.playerB
+        : null
+    : null;
+
+  useEffect(() => {
+    if (champion && championRef.current) {
+      setTimeout(() => {
+        championRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
+    }
+  }, [champion]);
 
   const trimmedSearch = search.trim().toLowerCase();
   const matchHasGamerTag = (m: typeof upcomingMatches[number]) => {
@@ -183,6 +205,52 @@ export function PublicView() {
         )}
       </section>
 
+      {playoffs && playoffs.length > 0 && (
+        <section>
+          <div className="flex flex-wrap items-center justify-between mb-3 gap-3">
+            <SectionTitle noMargin>Playoffs</SectionTitle>
+            <Link
+              to={`/t/${slug}/playoffs`}
+              className="font-display tracking-widest uppercase text-xs px-3 py-1.5 border border-border hover:border-accent-yellow hover:text-accent-yellow transition-colors clip-angled whitespace-nowrap"
+            >
+              Manage bracket →
+            </Link>
+          </div>
+          <Card className="p-4 sm:p-6">
+            <div className="overflow-x-auto">
+              <BracketView bracket={playoffs} isAdmin={false} />
+            </div>
+
+            {champion && (
+              <div ref={championRef} className="mt-8 pt-8 border-t border-border">
+                <div className="max-w-sm mx-auto text-center space-y-4">
+                  <div className="text-6xl animate-pulse">👑</div>
+                  <div className="text-sm font-display tracking-widest uppercase text-text-muted">
+                    Tournament Champion
+                  </div>
+                  <div className="space-y-3 flex flex-col items-center">
+                    <CharacterAvatar
+                      name={champion.gamerTag}
+                      character={champion.character}
+                      size="xl"
+                    />
+                    <h3 className="font-display text-4xl tracking-wider text-accent-yellow">
+                      {champion.gamerTag}
+                    </h3>
+                    <Badge tone="gold">{champion.character}</Badge>
+                  </div>
+                  <div className="pt-4 border-t border-border text-xs text-text-secondary">
+                    <p>🔥 First to 3 wins in Streak Mode</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </Card>
+        </section>
+      )}
+
+      {champion && <Confetti />}
+
       {history && history.length >= 2 && (
         <section>
           <SectionTitle>Standings History</SectionTitle>
@@ -267,21 +335,6 @@ export function PublicView() {
         )}
       </div>
 
-      {playoffs && playoffs.length > 0 && (
-        <section>
-          <SectionTitle>Playoffs</SectionTitle>
-          <p className="text-text-secondary text-sm mb-3">
-            Track the bracket on the{' '}
-            <Link
-              to={`/t/${slug}/playoffs`}
-              className="text-accent-yellow hover:underline"
-            >
-              admin playoffs page
-            </Link>
-            .
-          </p>
-        </section>
-      )}
     </div>
   );
 }
